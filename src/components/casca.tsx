@@ -1,81 +1,39 @@
-import Link from "next/link";
-import { Logotipo, Rodape, SimboloZ } from "@/components/marca";
+import { cookies } from "next/headers";
+import { Rodape } from "@/components/marca";
+import { Lateral, type Frente } from "@/components/lateral";
 
-export type Frente = "expedicao" | "logistica" | "integracao";
+export type { Frente };
 
-const FRENTES: { chave: Frente; rotulo: string; href: string }[] = [
-  { chave: "expedicao", rotulo: "Expedição", href: "/expedicao" },
-  { chave: "logistica", rotulo: "Logística", href: "/logistica" },
-  { chave: "integracao", rotulo: "Integração", href: "/integracao" },
-];
-
-export function Casca({
+/**
+ * A lateral substitui a antiga barra de cima em vez de somar a ela: dois
+ * cromos pela metade custam mais espaço que um inteiro. Ela carrega a marca,
+ * as frentes e o usuário, e o topo da tela passa a ser a faixa de abas.
+ */
+export async function Casca({
   frente,
   email,
+  compacta,
   children,
 }: {
   frente: Frente;
   email: string;
+  /** Telas de bancada abrem com a lateral recolhida: ali largura vale mais. */
+  compacta?: boolean;
   children: React.ReactNode;
 }) {
-  const iniciais =
-    email
-      .split("@")[0]
-      .split(/[.\-_]/)
-      .slice(0, 2)
-      .map((p) => p[0]?.toUpperCase() ?? "")
-      .join("") || "?";
+  const escolha = (await cookies()).get("zyntra_lateral")?.value;
+  const recolhida = escolha
+    ? escolha === "recolhida"
+    : Boolean(compacta);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-fundo">
-      <header className="flex h-[58px] shrink-0 items-center gap-4 bg-grafite px-5 text-offwhite">
-        <span className="flex items-center gap-[11px]">
-          <SimboloZ className="block h-[25px] w-[25px]" />
-          <Logotipo className="block h-[14px] w-auto text-offwhite" />
-        </span>
+    <div className="flex min-h-dvh">
+      <Lateral frente={frente} email={email} recolhidaInicial={recolhida} />
 
-        <nav
-          aria-label="Frente"
-          className="flex gap-[2px] rounded-lg border border-grafite-linha bg-[#19252A] p-[2px]"
-        >
-          {FRENTES.map((f) => (
-            <Link
-              key={f.chave}
-              href={f.href}
-              aria-current={f.chave === frente ? "page" : undefined}
-              className={`rounded-md px-[13px] py-[5px] text-[12.5px] font-semibold ${
-                f.chave === frente
-                  ? "bg-champanhe text-grafite"
-                  : "text-cinza-2 hover:text-offwhite"
-              }`}
-            >
-              {f.rotulo}
-            </Link>
-          ))}
-        </nav>
-
-        <span className="flex-1" />
-
-        <span className="flex items-center gap-[9px]">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#2A3A40] text-[11px] font-bold text-champanhe">
-            {iniciais}
-          </span>
-          <span className="text-[12.5px] font-semibold">{email}</span>
-        </span>
-
-        <form action="/auth/sair" method="post">
-          <button
-            type="submit"
-            className="rounded-md border border-grafite-linha px-3 py-[6px] text-[12px] font-semibold text-cinza-2 hover:text-offwhite"
-          >
-            Sair
-          </button>
-        </form>
-      </header>
-
-      <main className="flex flex-1 flex-col">{children}</main>
-
-      <Rodape className="shrink-0 border-t border-grafite-linha bg-grafite px-5 py-[10px]" />
+      <div className="flex min-w-0 flex-1 flex-col bg-fundo">
+        <main className="flex flex-1 flex-col">{children}</main>
+        <Rodape className="shrink-0 border-t border-grafite-linha bg-grafite px-5 py-[10px]" />
+      </div>
     </div>
   );
 }

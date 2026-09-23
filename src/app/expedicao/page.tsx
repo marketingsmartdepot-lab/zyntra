@@ -64,7 +64,11 @@ export default async function PaginaExpedicao({
     .limit(200);
 
   return (
-    <Casca frente="expedicao" email={user.email ?? "sem e-mail"}>
+    <Casca
+      frente="expedicao"
+      email={user.email ?? "sem e-mail"}
+      compacta={vista === "conferir"}
+    >
       <nav
         aria-label="Etapas da esteira"
         className="flex shrink-0 items-stretch gap-[30px] overflow-x-auto border-b border-linha bg-superficie px-5"
