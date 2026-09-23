@@ -1,4 +1,5 @@
 import { moeda, quando } from "./formato";
+import { abrirSaida } from "./acoes";
 
 export type Destino = {
   modalidade_id: string | null;
@@ -65,12 +66,30 @@ export function Doca({ destinos }: { destinos: Destino[] }) {
               </span>
             )}
 
-            <button
-              type="button"
-              className="rounded-lg bg-tinta px-3 py-[7px] text-[12.5px] font-semibold text-white"
-            >
-              Abrir estação de saída
-            </button>
+            {/*
+              O nome de quem leva é pedido na abertura, uma vez por carga, e
+              não a cada pacote: é uma pessoa só puxando o carrinho.
+            */}
+            <form action={abrirSaida} className="flex items-center gap-2">
+              <input
+                type="hidden"
+                name="modalidade"
+                value={d.modalidade_id ?? ""}
+              />
+              <input
+                name="motorista"
+                placeholder="quem está levando"
+                aria-label={`Quem está levando os pacotes de ${d.modalidade}`}
+                className="w-[168px] rounded-lg border border-linha bg-superficie px-3 py-[7px] text-[12.5px]"
+              />
+              <button
+                type="submit"
+                disabled={!d.modalidade_id}
+                className="rounded-lg bg-tinta px-3 py-[7px] text-[12.5px] font-semibold text-white disabled:opacity-50"
+              >
+                Abrir estação de saída
+              </button>
+            </form>
           </header>
 
           <p className="px-4 py-3 text-[12.5px] text-suave">

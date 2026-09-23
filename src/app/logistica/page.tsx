@@ -3,8 +3,9 @@ import Link from "next/link";
 import { Casca } from "@/components/casca";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Doca } from "./doca";
-import { EstacaoDeSaida } from "./saida";
+import { EstacaoDeSaida, type SaidaResumo } from "./saida";
 import { Fechamento } from "./fechamento";
+import { BancadaDeSaida } from "./bancada";
 
 export const metadata = { title: "Logística — ZYNTRA" };
 
@@ -19,7 +20,13 @@ type Aba = (typeof ABAS)[number]["chave"];
 export default async function PaginaLogistica({
   searchParams,
 }: {
-  searchParams: Promise<{ aba?: string }>;
+  searchParams: Promise<{
+    aba?: string;
+    saida?: string;
+    bipar?: string;
+    falha?: string;
+    fechada?: string;
+  }>;
 }) {
   const supabase = await criarClienteServidor();
   const {
@@ -27,7 +34,7 @@ export default async function PaginaLogistica({
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar?destino=/logistica");
 
-  const { aba: pedida } = await searchParams;
+  const { aba: pedida, saida: saidaId, bipar, falha, fechada } = await searchParams;
   const aba: Aba = ABAS.some((a) => a.chave === pedida)
     ? (pedida as Aba)
     : "doca";
@@ -48,6 +55,13 @@ export default async function PaginaLogistica({
   const abertas = (saidas ?? []).filter(
     (s: { situacao: string }) => s.situacao === "em_andamento",
   );
+
+  // A bancada só abre para uma saída que ainda aceita bipe. Uma já fechada
+  // volta para a lista em vez de mostrar um leitor que não registra nada.
+  const naBancada =
+    bipar === "1" && saidaId
+      ? ((abertas as SaidaResumo[]).find((s) => s.id === saidaId) ?? null)
+      : null;
 
   return (
     <Casca frente="logistica" email={user.email ?? "sem e-mail"}>
@@ -87,9 +101,39 @@ export default async function PaginaLogistica({
           "Soma dos valores congelados no instante do bipe. Só o Flex tem custo."}
       </p>
 
+      {falha && (
+        <p className="shrink-0 border-b border-critico-linha bg-critico-bg px-5 py-[10px] text-[12.5px] font-semibold text-critico">
+          {falha === "saida_vazia"
+            ? "Nada foi bipado nesta saída, então não há o que fechar."
+            : falha === "saida_nao_aberta"
+              ? "Esta saída já estava fechada."
+              : falha === "modalidade_nao_encontrada"
+                ? "Este destino não existe mais."
+                : "Não foi possível concluir a operação."}
+        </p>
+      )}
+
+      {fechada && (
+        <p className="shrink-0 border-b border-ok-linha bg-ok-bg px-5 py-[10px] text-[12.5px] font-semibold text-ok">
+          Saída fechada. O valor acumulado entra no fechamento do mês.
+        </p>
+      )}
+
       <div className="flex-1 bg-superficie">
         {aba === "doca" && <Doca destinos={destinos ?? []} />}
-        {aba === "saida" && <EstacaoDeSaida saidas={saidas ?? []} />}
+        {aba === "saida" &&
+          (naBancada ? (
+            <BancadaDeSaida
+              saidaId={naBancada.id}
+              codigo={naBancada.codigo}
+              modalidade={naBancada.modalidade}
+              jaBipados={naBancada.pacotes}
+              totalInicial={Number(naBancada.total)}
+              aindaNaDoca={naBancada.na_doca}
+            />
+          ) : (
+            <EstacaoDeSaida saidas={saidas ?? []} />
+          ))}
         {aba === "fechamento" && <Fechamento />}
       </div>
     </Casca>

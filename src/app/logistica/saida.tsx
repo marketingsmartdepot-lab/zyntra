@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { hora, moeda, quando } from "./formato";
+import { fecharSaida } from "./acoes";
 
 export type SaidaResumo = {
   id: string;
@@ -105,12 +107,27 @@ function Cartao({ saida }: { saida: SaidaResumo }) {
           {saida.motorista && ` · motorista ${saida.motorista}`}
         </span>
         <span className="flex-1" />
-        <button
-          type="button"
-          className="rounded-lg bg-tinta px-3 py-[7px] text-[12.5px] font-semibold text-white"
+        <form action={fecharSaida}>
+          <input type="hidden" name="saida" value={saida.id} />
+          <button
+            type="submit"
+            disabled={saida.pacotes === 0}
+            title={
+              saida.pacotes === 0
+                ? "Nada bipado ainda — não há o que fechar"
+                : undefined
+            }
+            className="rounded-lg border border-linha px-3 py-[7px] text-[12.5px] font-semibold disabled:opacity-50"
+          >
+            Fechar saída
+          </button>
+        </form>
+        <Link
+          href={`/logistica?aba=saida&saida=${saida.id}&bipar=1`}
+          className="rounded-lg bg-tinta px-3 py-[7px] text-[12.5px] font-semibold text-white no-underline"
         >
           Abrir bancada de saída
-        </button>
+        </Link>
       </header>
 
       <div className="flex flex-wrap gap-3 p-4">
