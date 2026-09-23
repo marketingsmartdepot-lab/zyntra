@@ -162,12 +162,24 @@ export async function Impressoras() {
           >
             Estação
           </label>
+          {/*
+            Obrigatória, e sem opção vazia: a impressão é roteada PELA bancada.
+            Impressora sem bancada aceita token e aceita agente, mas nunca
+            recebe trabalho — bancada montada, agente rodando, nada saindo.
+          */}
           <select
             id="imp-estacao"
             name="estacao"
-            className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
+            required
+            defaultValue=""
+            disabled={bancadas.length === 0}
+            className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px] disabled:text-suave"
           >
-            <option value="">sem estação</option>
+            <option value="" disabled>
+              {bancadas.length === 0
+                ? "cadastre uma estação primeiro"
+                : "escolha a bancada"}
+            </option>
             {bancadas.map((e) => (
               <option key={e.id} value={e.id}>
                 {e.nome}

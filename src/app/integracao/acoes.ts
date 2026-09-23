@@ -18,12 +18,15 @@ export async function criarEstacao(formData: FormData) {
 
 export async function criarImpressora(formData: FormData) {
   const nome = String(formData.get("nome") ?? "").trim();
-  if (!nome) return;
+  // A bancada não é opcional: a impressão é roteada por ela. O banco também
+  // recusa, mas recusar aqui evita uma ida ao servidor para nada.
+  const estacao = String(formData.get("estacao") ?? "").trim();
+  if (!nome || !estacao) return;
 
   const supabase = await criarClienteServidor();
   await supabase.from("impressoras").insert({
     nome,
-    estacao_id: String(formData.get("estacao") ?? "") || null,
+    estacao_id: estacao,
     modelo: String(formData.get("modelo") ?? "").trim() || null,
     linguagem: String(formData.get("linguagem") ?? "zpl"),
     conexao: String(formData.get("conexao") ?? "usb"),

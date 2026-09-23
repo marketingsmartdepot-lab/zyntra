@@ -42,3 +42,4 @@ next-env.d.ts
 
 # manter o exemplo versionado
 !.env.example
+!.env.exemplo
