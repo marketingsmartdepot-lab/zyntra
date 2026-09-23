@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { concluirLista, iniciarLista } from "./acoes";
+import { concluirLista, imprimirLista, iniciarLista } from "./acoes";
 
 type Resumo = {
   id: string;
@@ -22,7 +22,13 @@ type Item = {
   pacotes: number;
 };
 
-export async function PainelListas({ listaId }: { listaId?: string }) {
+export async function PainelListas({
+  listaId,
+  impressao,
+}: {
+  listaId?: string;
+  impressao?: string;
+}) {
   const supabase = await criarClienteServidor();
 
   const { data } = await supabase
@@ -75,7 +81,7 @@ export async function PainelListas({ listaId }: { listaId?: string }) {
 
       <section className="flex min-w-0 flex-1 flex-col">
         {aberta ? (
-          <ListaAberta lista={aberta} />
+          <ListaAberta lista={aberta} impressao={impressao} />
         ) : (
           <p className="p-6 text-[13.5px] text-suave">
             Escolha uma lista à esquerda.
@@ -127,7 +133,13 @@ function Grupo({
   );
 }
 
-async function ListaAberta({ lista }: { lista: Resumo }) {
+async function ListaAberta({
+  lista,
+  impressao,
+}: {
+  lista: Resumo;
+  impressao?: string;
+}) {
   const supabase = await criarClienteServidor();
   const { data } = await supabase
     .from("listas_itens")
@@ -175,6 +187,15 @@ async function ListaAberta({ lista }: { lista: Resumo }) {
                 </button>
               </form>
             )}
+            <form action={imprimirLista}>
+              <input type="hidden" name="lista" value={lista.id} />
+              <button
+                type="submit"
+                className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
+              >
+                Imprimir folha
+              </button>
+            </form>
             <form action={concluirLista}>
               <input type="hidden" name="lista" value={lista.id} />
               <button
@@ -187,6 +208,8 @@ async function ListaAberta({ lista }: { lista: Resumo }) {
           </>
         )}
       </header>
+
+      {impressao && <AvisoImpressao resultado={impressao} />}
 
       {itens.length === 0 ? (
         <p className="px-5 py-8 text-[13.5px] text-suave">
@@ -263,4 +286,38 @@ function rotuloSituacao(s: string) {
       : s === "concluida"
         ? "Concluída"
         : "Cancelada";
+}
+
+/**
+ * O que aconteceu com o pedido de impressão, dito por inteiro.
+ *
+ * Cada recusa aponta para a coisa que precisa ser resolvida, porque "falhou ao
+ * imprimir" manda o operador chamar alguém em vez de resolver sozinho.
+ */
+function AvisoImpressao({ resultado }: { resultado: string }) {
+  if (resultado === "ok") {
+    return (
+      <p className="border-b border-ok-linha bg-ok-bg px-5 py-[10px] text-[12.5px] font-semibold text-ok">
+        Folha enviada para a impressora desta bancada.
+      </p>
+    );
+  }
+
+  const texto: Record<string, string> = {
+    agente_offline:
+      "O agente desta bancada não está respondendo. Sem ele o computador não fala com a impressora — confira se o programa está rodando na máquina.",
+    estacao_sem_impressora:
+      "Esta bancada não tem impressora cadastrada. Cadastre em Integração.",
+    estacao_nao_informada:
+      "Esta máquina ainda não sabe qual bancada é. Escolha em Qual bancada é esta.",
+    sem_conteudo:
+      "A folha saiu vazia, então nada foi enfileirado. Isso acontece quando nenhum item da lista tem SKU mapeado.",
+    lista_nao_encontrada: "Esta lista não existe mais.",
+  };
+
+  return (
+    <p className="border-b border-critico-linha bg-critico-bg px-5 py-[10px] text-[12.5px] font-semibold text-critico">
+      {texto[resultado] ?? "Não foi possível enviar para a impressora."}
+    </p>
+  );
 }

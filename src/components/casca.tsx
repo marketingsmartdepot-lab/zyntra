@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { Rodape } from "@/components/marca";
 import { Lateral, type Frente } from "@/components/lateral";
+import { criarClienteServidor } from "@/lib/supabase/server";
+import { estacaoDaMaquina } from "@/lib/estacao";
 
 export type { Frente };
 
@@ -26,9 +28,30 @@ export async function Casca({
     ? escolha === "recolhida"
     : Boolean(compacta);
 
+  // Qual bancada é esta máquina fica visível o tempo todo. É o dado que decide
+  // em qual impressora a etiqueta sai — se estiver errado, o papel aparece na
+  // outra ponta do galpão e ninguém entende por quê.
+  const estacaoId = await estacaoDaMaquina();
+  let bancada: string | null = null;
+
+  if (estacaoId) {
+    const supabase = await criarClienteServidor();
+    const { data } = await supabase
+      .from("estacoes")
+      .select("nome")
+      .eq("id", estacaoId)
+      .maybeSingle();
+    bancada = (data as { nome: string } | null)?.nome ?? null;
+  }
+
   return (
     <div className="flex min-h-dvh">
-      <Lateral frente={frente} email={email} recolhidaInicial={recolhida} />
+      <Lateral
+        frente={frente}
+        email={email}
+        recolhidaInicial={recolhida}
+        bancada={bancada}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col bg-fundo">
         <main className="flex flex-1 flex-col">{children}</main>

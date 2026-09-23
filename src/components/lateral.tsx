@@ -17,10 +17,13 @@ export function Lateral({
   frente,
   email,
   recolhidaInicial,
+  bancada,
 }: {
   frente: Frente;
   email: string;
   recolhidaInicial: boolean;
+  /** Qual bancada é esta máquina. `null` quando ainda não foi escolhida. */
+  bancada?: string | null;
 }) {
   const [recolhida, setRecolhida] = useState(recolhidaInicial);
 
@@ -86,6 +89,49 @@ export function Lateral({
       </nav>
 
       <span className="flex-1" />
+
+      {/*
+        Sem bancada escolhida a impressão não tem para onde ir, então o aviso
+        fica em vermelho — é falta de configuração, não detalhe.
+      */}
+      <Link
+        href="/bancada"
+        title={bancada ? `Esta máquina é a ${bancada}` : "Escolher a bancada"}
+        className={`mx-[10px] mb-2 flex items-center gap-[10px] rounded-lg border px-3 py-[9px] no-underline ${
+          recolhida ? "justify-center px-0" : ""
+        } ${
+          bancada
+            ? "border-grafite-linha text-cinza-2 hover:text-offwhite"
+            : "border-critico/50 bg-critico/10 text-[#F0B8B0]"
+        }`}
+      >
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className="shrink-0"
+        >
+          <path d="M6 9V4h12v5" />
+          <path d="M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+          <path d="M6 14h12v7H6z" />
+        </svg>
+        {!recolhida && (
+          <span className="min-w-0 flex-1 truncate text-left">
+            <span className="block text-[9.5px] font-semibold uppercase tracking-[0.13em] opacity-70">
+              Esta bancada
+            </span>
+            <span className="block truncate text-[12px] font-semibold">
+              {bancada ?? "não escolhida"}
+            </span>
+          </span>
+        )}
+      </Link>
 
       <div className="border-t border-grafite-linha px-[10px] py-3">
         <button

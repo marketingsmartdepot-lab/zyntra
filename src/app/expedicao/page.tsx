@@ -31,7 +31,13 @@ const SELECAO = `
 export default async function PaginaExpedicao({
   searchParams,
 }: {
-  searchParams: Promise<{ etapa?: string; pacote?: string; lista?: string; falha?: string }>;
+  searchParams: Promise<{
+    etapa?: string;
+    pacote?: string;
+    lista?: string;
+    falha?: string;
+    impressao?: string;
+  }>;
 }) {
   const supabase = await criarClienteServidor();
   const {
@@ -39,7 +45,7 @@ export default async function PaginaExpedicao({
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar?destino=/expedicao");
 
-  const { etapa: pedida, pacote, lista, falha } = await searchParams;
+  const { etapa: pedida, pacote, lista, falha, impressao } = await searchParams;
   const vista: Vista = pedida && ehVista(pedida) ? pedida : "separar";
   // "listas" não é etapa: a consulta de pacotes continua olhando Separar.
   const etapaAtiva: Etapa = vista === "listas" ? "separar" : vista;
@@ -127,7 +133,7 @@ export default async function PaginaExpedicao({
 
       <div className="flex flex-1 flex-col bg-superficie">
         {vista === "listas" ? (
-          <PainelListas listaId={lista} />
+          <PainelListas listaId={lista} impressao={impressao} />
         ) : vista === "aberto" && !pacote ? (
           <AbertoPorCausa />
         ) : pacote ? (
