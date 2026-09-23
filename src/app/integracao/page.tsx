@@ -6,6 +6,7 @@ import { Contas } from "./contas";
 import { Impressoras } from "./impressoras";
 import { Operadores } from "./operadores";
 import { Estoque } from "./estoque";
+import { Cadastros } from "./cadastros";
 
 export const metadata = { title: "Integração — ZYNTRA" };
 
@@ -14,6 +15,7 @@ const ABAS = [
   { chave: "impressoras", rotulo: "Estações e impressoras" },
   { chave: "operadores", rotulo: "Operadores" },
   { chave: "estoque", rotulo: "Estoque" },
+  { chave: "cadastros", rotulo: "Cadastros" },
 ] as const;
 
 type Aba = (typeof ABAS)[number]["chave"];
@@ -50,6 +52,11 @@ export default async function PaginaIntegracao({
     .select("id", { count: "exact", head: true })
     .neq("situacao", "enviada");
 
+  const { count: empresas } = await supabase
+    .from("empresas")
+    .select("id", { count: "exact", head: true })
+    .eq("ativa", true);
+
   return (
     <Casca frente="integracao" email={user.email ?? "sem e-mail"}>
       <nav
@@ -80,6 +87,12 @@ export default async function PaginaIntegracao({
           contagem={baixasNaFila ?? 0}
           ativa={aba === "estoque"}
         />
+        <AbaLink
+          chave="cadastros"
+          rotulo="Cadastros"
+          contagem={empresas ?? 0}
+          ativa={aba === "cadastros"}
+        />
         <span className="flex-1" />
       </nav>
 
@@ -92,6 +105,8 @@ export default async function PaginaIntegracao({
           "Quem trabalha na bancada não usa e-mail e senha: entra com nome e PIN. São coisas separadas de propósito."}
         {aba === "estoque" &&
           "A baixa acontece quando a NF-e é autorizada, não quando a caixa sai — senão a peça segue vendável por horas."}
+        {aba === "cadastros" &&
+          "O que o sistema lê e ninguém tinha onde criar. Muda raramente, então fica tudo junto."}
       </p>
 
       <div className="flex flex-1 flex-col bg-superficie">
@@ -99,6 +114,7 @@ export default async function PaginaIntegracao({
         {aba === "impressoras" && <Impressoras />}
         {aba === "operadores" && <Operadores falha={falha} />}
         {aba === "estoque" && <Estoque falha={falha} />}
+        {aba === "cadastros" && <Cadastros falha={falha} />}
       </div>
     </Casca>
   );
