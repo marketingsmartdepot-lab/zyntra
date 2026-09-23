@@ -5,6 +5,10 @@ import { Bancada, type ItemConferido } from "./bancada";
 import { iniciarConferencia } from "./acoes";
 import { turnoDaMaquina } from "@/lib/estacao";
 import type { DivergenciaAberta, Lider } from "./divergencia";
+import {
+  PainelEtiqueta,
+  type ImpressaoDaEtiqueta,
+} from "./etiqueta-painel";
 
 type PacoteNaFila = {
   id: string;
@@ -31,11 +35,13 @@ export async function PainelDetalhe({
   pacoteId,
   etapa,
   liberacao,
+  etiqueta,
 }: {
   fila: PacoteNaFila[];
   pacoteId: string;
   etapa: Etapa;
   liberacao?: string;
+  etiqueta?: string;
 }) {
   const selecionado = fila.find((p) => p.id === pacoteId) ?? null;
 
@@ -97,6 +103,7 @@ export async function PainelDetalhe({
             fila={fila}
             etapa={etapa}
             liberacao={liberacao}
+            etiqueta={etiqueta}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center px-6 py-20">
@@ -115,15 +122,26 @@ async function Detalhe({
   fila,
   etapa,
   liberacao,
+  etiqueta,
 }: {
   pacote: PacoteNaFila;
   fila: PacoteNaFila[];
   etapa: Etapa;
   liberacao?: string;
+  etiqueta?: string;
 }) {
   const supabase = await criarClienteServidor();
   const pedidos = pacote.envios?.pedidos ?? [];
   const turno = await turnoDaMaquina();
+
+  // O histórico de impressão da etiqueta decide o que a tela oferece:
+  // imprimir, ou reimprimir exigindo motivo.
+  const { data: impressoesEtiqueta } = await supabase
+    .from("impressoes")
+    .select("situacao, erro, enviada_em, reimpressao")
+    .eq("pacote_id", pacote.id)
+    .eq("tipo", "etiqueta")
+    .order("enviada_em", { ascending: false });
 
   const [{ data: conferencias }, { data: eventos }] = await Promise.all([
     supabase
@@ -240,6 +258,14 @@ async function Detalhe({
           {pacote.unidades_esperadas ?? "—"}
         </dd>
       </dl>
+
+      {etapa === "pronto" && (
+        <PainelEtiqueta
+          pacoteId={pacote.id}
+          impressoes={(impressoesEtiqueta ?? []) as ImpressaoDaEtiqueta[]}
+          resultado={etiqueta}
+        />
+      )}
 
       {etapa === "conferir" ? (
         conferencia ? (
