@@ -46,6 +46,7 @@ export function Bancada({
   pacoteId,
   divergencia,
   jaLiberada,
+  operadorId,
   lideres,
   liberacao,
 }: {
@@ -57,6 +58,8 @@ export function Bancada({
   divergencia: DivergenciaAberta | null;
   /** Já houve liberação de líder nesta conferência: pode fechar com diferença. */
   jaLiberada: boolean;
+  /** Quem está em turno. Cada leitura fica no nome dele. */
+  operadorId: string | null;
   lideres: Lider[];
   liberacao?: string;
 }) {
@@ -103,6 +106,7 @@ export function Bancada({
         p_conferencia_id: conferenciaId,
         p_codigo: lido,
         p_chave_cliente: chave,
+        p_operador_id: operadorId,
       });
 
       if (!error) {

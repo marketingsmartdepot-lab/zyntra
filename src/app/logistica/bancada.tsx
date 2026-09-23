@@ -35,6 +35,7 @@ export function BancadaDeSaida({
   jaBipados,
   totalInicial,
   aindaNaDoca,
+  operadorId,
 }: {
   saidaId: string;
   codigo: string;
@@ -42,6 +43,8 @@ export function BancadaDeSaida({
   jaBipados: number;
   totalInicial: number;
   aindaNaDoca: number;
+  /** Quem está em turno. Cada bipe fica no nome dele. */
+  operadorId: string | null;
 }) {
   const campo = useRef<HTMLInputElement>(null);
   const [lido, setLido] = useState("");
@@ -72,6 +75,7 @@ export function BancadaDeSaida({
     const { data, error } = await supabase.rpc("bipar_saida_por_codigo", {
       p_saida_id: saidaId,
       p_codigo: valor,
+      p_operador_id: operadorId,
     });
 
     if (error) {

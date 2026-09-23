@@ -3,6 +3,7 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import type { Etapa } from "@/lib/supabase/tipos";
 import { Bancada, type ItemConferido } from "./bancada";
 import { iniciarConferencia } from "./acoes";
+import { turnoDaMaquina } from "@/lib/estacao";
 import type { DivergenciaAberta, Lider } from "./divergencia";
 
 type PacoteNaFila = {
@@ -122,6 +123,7 @@ async function Detalhe({
 }) {
   const supabase = await criarClienteServidor();
   const pedidos = pacote.envios?.pedidos ?? [];
+  const turno = await turnoDaMaquina();
 
   const [{ data: conferencias }, { data: eventos }] = await Promise.all([
     supabase
@@ -248,6 +250,7 @@ async function Detalhe({
             pacoteId={pacote.id}
             divergencia={divergencia}
             jaLiberada={jaLiberada}
+            operadorId={turno?.operadorId ?? null}
             lideres={lideres}
             liberacao={liberacao}
           />

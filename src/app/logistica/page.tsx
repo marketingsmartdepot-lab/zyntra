@@ -6,6 +6,7 @@ import { Doca } from "./doca";
 import { EstacaoDeSaida, type SaidaResumo } from "./saida";
 import { Fechamento } from "./fechamento";
 import { BancadaDeSaida } from "./bancada";
+import { turnoDaMaquina } from "@/lib/estacao";
 
 export const metadata = { title: "Logística — ZYNTRA" };
 
@@ -58,6 +59,8 @@ export default async function PaginaLogistica({
 
   // A bancada só abre para uma saída que ainda aceita bipe. Uma já fechada
   // volta para a lista em vez de mostrar um leitor que não registra nada.
+  const turno = await turnoDaMaquina();
+
   const naBancada =
     bipar === "1" && saidaId
       ? ((abertas as SaidaResumo[]).find((s) => s.id === saidaId) ?? null)
@@ -130,6 +133,7 @@ export default async function PaginaLogistica({
               jaBipados={naBancada.pacotes}
               totalInicial={Number(naBancada.total)}
               aindaNaDoca={naBancada.na_doca}
+              operadorId={turno?.operadorId ?? null}
             />
           ) : (
             <EstacaoDeSaida saidas={saidas ?? []} />

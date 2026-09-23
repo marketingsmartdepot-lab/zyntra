@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { estacaoDaMaquina } from "@/lib/estacao";
+import { estacaoDaMaquina, turnoDaMaquina } from "@/lib/estacao";
 import { listaDeSeparacao } from "@/lib/zpl";
 
 export async function gerarLista(formData: FormData) {
@@ -96,11 +96,14 @@ export async function imprimirLista(formData: FormData) {
     }[],
   );
 
+  const turno = await turnoDaMaquina();
+
   const { data, error } = await supabase.rpc("solicitar_impressao", {
     p_tipo: "lista_separacao",
     p_conteudo: zpl,
     p_lista_id: listaId,
     p_estacao_id: estacao,
+    p_operador_id: turno?.operadorId ?? null,
   });
 
   if (error) return voltar("erro");

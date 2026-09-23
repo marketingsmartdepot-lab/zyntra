@@ -4,12 +4,14 @@ import { Casca } from "@/components/casca";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Contas } from "./contas";
 import { Impressoras } from "./impressoras";
+import { Operadores } from "./operadores";
 
 export const metadata = { title: "Integração — ZYNTRA" };
 
 const ABAS = [
   { chave: "contas", rotulo: "Conexão das contas" },
   { chave: "impressoras", rotulo: "Estações e impressoras" },
+  { chave: "operadores", rotulo: "Operadores" },
 ] as const;
 
 type Aba = (typeof ABAS)[number]["chave"];
@@ -17,7 +19,7 @@ type Aba = (typeof ABAS)[number]["chave"];
 export default async function PaginaIntegracao({
   searchParams,
 }: {
-  searchParams: Promise<{ aba?: string }>;
+  searchParams: Promise<{ aba?: string; falha?: string }>;
 }) {
   const supabase = await criarClienteServidor();
   const {
@@ -25,15 +27,20 @@ export default async function PaginaIntegracao({
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar?destino=/integracao");
 
-  const { aba: pedida } = await searchParams;
+  const { aba: pedida, falha } = await searchParams;
   const aba: Aba = ABAS.some((a) => a.chave === pedida)
     ? (pedida as Aba)
     : "contas";
 
-  const [{ count: contas }, { count: impressoras }] = await Promise.all([
-    supabase.from("contas").select("id", { count: "exact", head: true }),
-    supabase.from("impressoras").select("id", { count: "exact", head: true }),
-  ]);
+  const [{ count: contas }, { count: impressoras }, { count: operadores }] =
+    await Promise.all([
+      supabase.from("contas").select("id", { count: "exact", head: true }),
+      supabase.from("impressoras").select("id", { count: "exact", head: true }),
+      supabase
+        .from("operadores")
+        .select("id", { count: "exact", head: true })
+        .eq("ativo", true),
+    ]);
 
   return (
     <Casca frente="integracao" email={user.email ?? "sem e-mail"}>
@@ -53,17 +60,28 @@ export default async function PaginaIntegracao({
           contagem={impressoras ?? 0}
           ativa={aba === "impressoras"}
         />
+        <AbaLink
+          chave="operadores"
+          rotulo="Operadores"
+          contagem={operadores ?? 0}
+          ativa={aba === "operadores"}
+        />
         <span className="flex-1" />
       </nav>
 
       <p className="shrink-0 border-b border-linha bg-fundo px-5 py-[11px] text-[12.5px] text-suave">
-        {aba === "contas"
-          ? "Quem fatura e de quem é o estoque são coisas separadas. Aqui isso fica explícito."
-          : "A impressora é alcançada por um agente na máquina da bancada. Navegador não fala com USB."}
+        {aba === "contas" &&
+          "Quem fatura e de quem é o estoque são coisas separadas. Aqui isso fica explícito."}
+        {aba === "impressoras" &&
+          "A impressora é alcançada por um agente na máquina da bancada. Navegador não fala com USB."}
+        {aba === "operadores" &&
+          "Quem trabalha na bancada não usa e-mail e senha: entra com nome e PIN. São coisas separadas de propósito."}
       </p>
 
       <div className="flex flex-1 flex-col bg-superficie">
-        {aba === "contas" ? <Contas /> : <Impressoras />}
+        {aba === "contas" && <Contas />}
+        {aba === "impressoras" && <Impressoras />}
+        {aba === "operadores" && <Operadores falha={falha} />}
       </div>
     </Casca>
   );

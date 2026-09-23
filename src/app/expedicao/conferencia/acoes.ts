@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { turnoDaMaquina } from "@/lib/estacao";
 
 /**
  * Abrir a conferência é MUTAÇÃO: cria a passagem pela bancada e congela o
@@ -11,8 +12,15 @@ import { criarClienteServidor } from "@/lib/supabase/server";
  */
 export async function iniciarConferencia(pacoteId: string) {
   const supabase = await criarClienteServidor();
+  // Quem abriu a conferência fica registrado. Sem isso o histórico diz que
+  // aconteceu, mas não quem fez — e é justamente disso que se precisa no dia
+  // seguinte, quando alguém pergunta por que faltou uma unidade.
+  const turno = await turnoDaMaquina();
+
   const { error } = await supabase.rpc("abrir_conferencia", {
     p_pacote_id: pacoteId,
+    p_estacao_id: turno?.estacaoId ?? null,
+    p_sessao_id: turno?.sessaoId ?? null,
   });
 
   if (error) {
@@ -25,8 +33,11 @@ export async function iniciarConferencia(pacoteId: string) {
 
 export async function concluirConferencia(conferenciaId: string) {
   const supabase = await criarClienteServidor();
+  const turno = await turnoDaMaquina();
+
   const { data, error } = await supabase.rpc("concluir_conferencia", {
     p_conferencia_id: conferenciaId,
+    p_operador_id: turno?.operadorId ?? null,
   });
 
   if (error) return { ok: false, mensagem: traduzir(error.message) };
@@ -61,10 +72,13 @@ export async function abrirDivergencia(formData: FormData) {
   if (!conferenciaId || !tipo) return;
 
   const supabase = await criarClienteServidor();
+  const turno = await turnoDaMaquina();
+
   await supabase.from("divergencias").insert({
     conferencia_id: conferenciaId,
     tipo,
     detalhe: detalhe || null,
+    aberta_por: turno?.operadorId ?? null,
   });
 
   revalidatePath("/expedicao");

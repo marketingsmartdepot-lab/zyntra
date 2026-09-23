@@ -33,15 +33,20 @@ export async function Casca({
   // outra ponta do galpão e ninguém entende por quê.
   const estacaoId = await estacaoDaMaquina();
   let bancada: string | null = null;
+  let turno: string | null = null;
 
   if (estacaoId) {
     const supabase = await criarClienteServidor();
-    const { data } = await supabase
-      .from("estacoes")
-      .select("nome")
-      .eq("id", estacaoId)
-      .maybeSingle();
-    bancada = (data as { nome: string } | null)?.nome ?? null;
+    const [{ data: est }, { data: t }] = await Promise.all([
+      supabase.from("estacoes").select("nome").eq("id", estacaoId).maybeSingle(),
+      supabase
+        .from("turnos_abertos")
+        .select("operador")
+        .eq("estacao_id", estacaoId)
+        .maybeSingle(),
+    ]);
+    bancada = (est as { nome: string } | null)?.nome ?? null;
+    turno = (t as { operador: string } | null)?.operador ?? null;
   }
 
   return (
@@ -51,6 +56,7 @@ export async function Casca({
         email={email}
         recolhidaInicial={recolhida}
         bancada={bancada}
+        turno={turno}
       />
 
       <div className="flex min-w-0 flex-1 flex-col bg-fundo">

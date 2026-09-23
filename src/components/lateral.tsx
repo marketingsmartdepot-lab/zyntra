@@ -18,12 +18,15 @@ export function Lateral({
   email,
   recolhidaInicial,
   bancada,
+  turno,
 }: {
   frente: Frente;
   email: string;
   recolhidaInicial: boolean;
   /** Qual bancada é esta máquina. `null` quando ainda não foi escolhida. */
   bancada?: string | null;
+  /** Quem está em turno nesta bancada. `null` quando ninguém abriu. */
+  turno?: string | null;
 }) {
   const [recolhida, setRecolhida] = useState(recolhidaInicial);
 
@@ -132,6 +135,50 @@ export function Lateral({
           </span>
         )}
       </Link>
+
+      {/*
+        Quem está na bancada agora. Sem turno aberto o trabalho não tem dono:
+        bipe, conferência e liberação ficam sem registro de quem fez.
+      */}
+      {bancada && (
+        <Link
+          href="/turno"
+          title={turno ? `Em turno: ${turno}` : "Abrir turno"}
+          className={`mx-[10px] mb-2 flex items-center gap-[10px] rounded-lg border px-3 py-[9px] no-underline ${
+            recolhida ? "justify-center px-0" : ""
+          } ${
+            turno
+              ? "border-grafite-linha text-cinza-2 hover:text-offwhite"
+              : "border-champanhe/40 bg-champanhe/10 text-champanhe"
+          }`}
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="shrink-0"
+          >
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 21a8 8 0 0 1 16 0" />
+          </svg>
+          {!recolhida && (
+            <span className="min-w-0 flex-1 truncate text-left">
+              <span className="block text-[9.5px] font-semibold uppercase tracking-[0.13em] opacity-70">
+                Em turno
+              </span>
+              <span className="block truncate text-[12px] font-semibold">
+                {turno ?? "abrir turno"}
+              </span>
+            </span>
+          )}
+        </Link>
+      )}
 
       <div className="border-t border-grafite-linha px-[10px] py-3">
         <button
