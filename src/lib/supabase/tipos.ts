@@ -83,6 +83,7 @@ export type LinhaPacote = {
     empresas: { nome_curto: string } | null;
     canais: {
       nome: string;
+      icone_url: string | null;
       sigla: string | null;
       cor: string | null;
       cor_texto: string | null;

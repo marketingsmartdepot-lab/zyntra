@@ -53,16 +53,7 @@ export function ListaPacotes({
                 )}
 
                 <Celula>
-                  <span
-                    title={canal?.nome ?? "canal não identificado"}
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-[7px] text-[9.5px] font-bold"
-                    style={{
-                      background: canal?.cor ?? "var(--color-linha)",
-                      color: canal?.cor_texto ?? "var(--color-suave)",
-                    }}
-                  >
-                    {canal?.sigla ?? "?"}
-                  </span>
+                  <Picto canal={canal} />
                 </Celula>
 
                 <Celula>
@@ -177,6 +168,50 @@ export function ListaPacotes({
         </button>
       </div>
     </form>
+  );
+}
+
+/**
+ * O picto do marketplace. Imagem de verdade, vinda de `canais.icone_url`.
+ * A sigla colorida só aparece quando o canal ainda não tem arquivo — é
+ * reserva, não o desenho.
+ */
+function Picto({
+  canal,
+}: {
+  canal: {
+    nome: string;
+    icone_url: string | null;
+    sigla: string | null;
+    cor: string | null;
+    cor_texto: string | null;
+  } | null;
+}) {
+  if (canal?.icone_url) {
+    return (
+      /* eslint-disable-next-line @next/next/no-img-element */
+      <img
+        src={canal.icone_url}
+        alt={canal.nome}
+        title={canal.nome}
+        width={28}
+        height={28}
+        className="block h-7 w-7 rounded-[7px] object-contain"
+      />
+    );
+  }
+
+  return (
+    <span
+      title={canal?.nome ?? "canal não identificado"}
+      className="inline-flex h-7 w-7 items-center justify-center rounded-[7px] text-[9.5px] font-bold"
+      style={{
+        background: canal?.cor ?? "var(--color-linha)",
+        color: canal?.cor_texto ?? "var(--color-suave)",
+      }}
+    >
+      {canal?.sigla ?? "?"}
+    </span>
   );
 }
 

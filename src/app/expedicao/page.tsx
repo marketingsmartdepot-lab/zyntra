@@ -22,7 +22,7 @@ const SELECAO = `
            pedidos ( ref_externa, pack_ref, comprador ) ),
   contas ( apelido,
            empresas:empresa_emissora_id ( nome_curto ),
-           canais ( nome, sigla, cor, cor_texto ) ),
+           canais ( nome, icone_url, sigla, cor, cor_texto ) ),
   notas_fiscais ( situacao, serie, numero, erro_mensagem ),
   bloqueios ( tipo, causa )
 `;
