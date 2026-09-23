@@ -5,6 +5,7 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import { Contas } from "./contas";
 import { Impressoras } from "./impressoras";
 import { Operadores } from "./operadores";
+import { Estoque } from "./estoque";
 
 export const metadata = { title: "Integração — ZYNTRA" };
 
@@ -12,6 +13,7 @@ const ABAS = [
   { chave: "contas", rotulo: "Conexão das contas" },
   { chave: "impressoras", rotulo: "Estações e impressoras" },
   { chave: "operadores", rotulo: "Operadores" },
+  { chave: "estoque", rotulo: "Estoque" },
 ] as const;
 
 type Aba = (typeof ABAS)[number]["chave"];
@@ -42,6 +44,12 @@ export default async function PaginaIntegracao({
         .eq("ativo", true),
     ]);
 
+  // A fila de baixas na aba: se encher, alguma coisa não está saindo.
+  const { count: baixasNaFila } = await supabase
+    .from("baixas_estoque")
+    .select("id", { count: "exact", head: true })
+    .neq("situacao", "enviada");
+
   return (
     <Casca frente="integracao" email={user.email ?? "sem e-mail"}>
       <nav
@@ -66,6 +74,12 @@ export default async function PaginaIntegracao({
           contagem={operadores ?? 0}
           ativa={aba === "operadores"}
         />
+        <AbaLink
+          chave="estoque"
+          rotulo="Estoque"
+          contagem={baixasNaFila ?? 0}
+          ativa={aba === "estoque"}
+        />
         <span className="flex-1" />
       </nav>
 
@@ -76,12 +90,15 @@ export default async function PaginaIntegracao({
           "A impressora é alcançada por um agente na máquina da bancada. Navegador não fala com USB."}
         {aba === "operadores" &&
           "Quem trabalha na bancada não usa e-mail e senha: entra com nome e PIN. São coisas separadas de propósito."}
+        {aba === "estoque" &&
+          "A baixa acontece quando a NF-e é autorizada, não quando a caixa sai — senão a peça segue vendável por horas."}
       </p>
 
       <div className="flex flex-1 flex-col bg-superficie">
         {aba === "contas" && <Contas falha={falha} />}
         {aba === "impressoras" && <Impressoras />}
         {aba === "operadores" && <Operadores falha={falha} />}
+        {aba === "estoque" && <Estoque falha={falha} />}
       </div>
     </Casca>
   );
