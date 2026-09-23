@@ -1,5 +1,16 @@
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { salvarDeposito, tentarBaixaDeNovo } from "./estoque-acoes";
+import {
+  salvarDeposito,
+  sincronizarCatalogo,
+  tentarBaixaDeNovo,
+} from "./estoque-acoes";
+
+type SemRef = {
+  id: string;
+  codigo: string;
+  descricao: string | null;
+  tem_anuncio: boolean;
+};
 
 type Config = {
   deposito_ref: string | null;
@@ -29,7 +40,8 @@ type Baixa = {
 export async function Estoque({ falha }: { falha?: string }) {
   const supabase = await criarClienteServidor();
 
-  const [{ data: config }, { data: fila }] = await Promise.all([
+  const [{ data: config }, { data: fila }, { data: semRef, count: totalSemRef }] =
+    await Promise.all([
     supabase
       .from("erp_config")
       .select("deposito_ref, ativo, atualizado_em")
@@ -42,6 +54,11 @@ export async function Estoque({ falha }: { falha?: string }) {
       .neq("situacao", "enviada")
       .order("criada_em", { ascending: false })
       .limit(30),
+    supabase
+      .from("skus_sem_erp")
+      .select("id, codigo, descricao, tem_anuncio", { count: "exact" })
+      .order("codigo")
+      .limit(20),
   ]);
 
   const c = (config ?? null) as Config | null;
@@ -110,6 +127,44 @@ export async function Estoque({ falha }: { falha?: string }) {
           Salvar
         </button>
       </form>
+
+      <section>
+        <h3 className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave">
+          Catálogo
+        </h3>
+        <p className="m-0 mb-3 max-w-[70ch] text-[12.5px] leading-relaxed text-suave">
+          Cada SKU precisa saber qual produto ele é no Bling. A sincronização
+          casa pelo código — e código repetido no Bling fica de fora em vez de
+          casar com qualquer um, porque casar errado daria baixa no produto
+          errado para sempre.
+        </p>
+
+        {(totalSemRef ?? 0) > 0 ? (
+          <div className="mb-3 rounded-[9px] border border-atencao-linha bg-atencao-bg px-4 py-3">
+            <p className="m-0 text-[12.5px] font-semibold text-atencao">
+              {totalSemRef} {totalSemRef === 1 ? "SKU ativo" : "SKUs ativos"} sem
+              referência no Bling — cada um é uma baixa que vai falhar.
+            </p>
+            <p className="m-0 mt-2 font-mono text-[11.5px] text-[#7A5A24]">
+              {((semRef ?? []) as SemRef[]).map((s) => s.codigo).join(" · ")}
+              {(totalSemRef ?? 0) > 20 && " …"}
+            </p>
+          </div>
+        ) : (
+          <p className="m-0 mb-3 text-[13px] text-suave">
+            Nenhum SKU ativo sem referência.
+          </p>
+        )}
+
+        <form action={sincronizarCatalogo}>
+          <button
+            type="submit"
+            className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
+          >
+            Sincronizar catálogo com o Bling
+          </button>
+        </form>
+      </section>
 
       <section>
         <h3 className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave">
@@ -226,9 +281,48 @@ function Aviso({ resultado }: { resultado: string }) {
     erp_desligado:
       "Envio desligado. As baixas continuam entrando na fila, sem sair.",
     refila: "As baixas com erro voltaram para a fila.",
-    sem_permissao: "Só administrador muda a configuração do estoque.",
+    sem_permissao: "Só líder ou administrador faz isso.",
+    sem_credencial:
+      "O Bling ainda não está conectado. Falta a credencial da aplicação.",
+    credencial_expirada:
+      "A conexão com o Bling expirou. É preciso reconectar.",
+    credencial_recusada: "O Bling recusou a credencial.",
+    bling_indisponivel: "Não foi possível falar com o Bling agora.",
+    servico_nao_publicado:
+      "A sincronização ainda não está ligada: falta conectar o Bling.",
+    servico_indisponivel: "O serviço não respondeu.",
+    sem_sessao: "Sua sessão expirou. Entre de novo.",
     erro: "Não foi possível salvar.",
   };
+
+  // O resultado da sincronização vem com números: quantos casaram e quantos
+  // ficaram sem referência. Contagem explícita, porque "sincronizado" sem
+  // número não diz se resolveu tudo ou nada.
+  if (resultado.startsWith("catalogo-")) {
+    const [, casados, semRef] = resultado.split("-");
+    const faltam = Number(semRef);
+    return (
+      <p
+        role="status"
+        className={`m-0 rounded-lg border px-4 py-3 text-[12.5px] font-semibold ${
+          faltam > 0
+            ? "border-atencao-linha bg-atencao-bg text-atencao"
+            : "border-ok-linha bg-ok-bg text-ok"
+        }`}
+      >
+        <b>{casados}</b> {Number(casados) === 1 ? "SKU casado" : "SKUs casados"}{" "}
+        com o Bling
+        {faltam > 0 ? (
+          <>
+            {" · "}
+            <b>{faltam}</b> ainda sem referência
+          </>
+        ) : (
+          " · nenhum ficou sem referência"
+        )}
+      </p>
+    );
+  }
 
   const ok = ["deposito_salvo", "erp_ligado", "erp_desligado", "refila"].includes(
     resultado,
