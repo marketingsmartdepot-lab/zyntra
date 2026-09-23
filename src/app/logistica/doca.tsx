@@ -1,5 +1,6 @@
 import { moeda, quando } from "./formato";
-import { abrirSaida } from "./acoes";
+import Link from "next/link";
+import { abrirEntregaDoca, abrirSaida } from "./acoes";
 
 export type Destino = {
   modalidade_id: string | null;
@@ -12,26 +13,119 @@ export type Destino = {
   prazo_mais_apertado: string | null;
 };
 
-export function Doca({ destinos }: { destinos: Destino[] }) {
+export type EntregaResumo = {
+  id: string;
+  codigo: string;
+  entregue_por: string;
+  entregue_em: string;
+  pacotes: number;
+  ja_sairam: number;
+};
+
+/**
+ * Abrir o carrinho que leva as caixas da expedição para a doca.
+ *
+ * O nome é pedido uma vez, na abertura: é uma pessoa por carrinho, e é por
+ * esse nome que se descobre quem estava com a caixa quando ela some.
+ */
+function AbrirCarrinho() {
+  return (
+    <form
+      action={abrirEntregaDoca}
+      className="flex flex-wrap items-end gap-2 rounded-[9px] border border-linha px-4 py-[14px]"
+    >
+      <div>
+        <label
+          htmlFor="doca-quem"
+          className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+        >
+          Quem está levando para a doca
+        </label>
+        <input
+          id="doca-quem"
+          name="entregue_por"
+          required
+          placeholder="nome de quem empurra o carrinho"
+          className="w-[280px] rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
+        />
+      </div>
+      <button
+        type="submit"
+        className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
+      >
+        Registrar entrega na doca
+      </button>
+      <span className="text-[12.5px] text-suave">
+        Depois é bipar cada caixa. O carrinho pode ser misto.
+      </span>
+    </form>
+  );
+}
+
+function EntregasDoDia({ entregas }: { entregas: EntregaResumo[] }) {
+  if (entregas.length === 0) return null;
+
+  return (
+    <section>
+      <h3 className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave">
+        Entregas de hoje
+      </h3>
+      <div className="flex flex-col gap-1">
+        {entregas.map((e) => (
+          <div
+            key={e.id}
+            className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-linha px-4 py-[9px] text-[12.5px]"
+          >
+            <span className="font-mono font-semibold">{e.codigo}</span>
+            <span className="text-suave">{e.entregue_por}</span>
+            <span className="text-suave">
+              {e.pacotes} {e.pacotes === 1 ? "caixa" : "caixas"}
+              {e.ja_sairam > 0 && ` · ${e.ja_sairam} já saíram`}
+            </span>
+            <span className="flex-1" />
+            <span className="text-suave">{quando(e.entregue_em)}</span>
+            <Link
+              href={`/logistica?aba=doca&entrega=${e.id}&bipar=1`}
+              className="font-semibold text-tinta no-underline"
+            >
+              Continuar bipando
+            </Link>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function Doca({
+  destinos,
+  entregas,
+}: {
+  destinos: Destino[];
+  entregas: EntregaResumo[];
+}) {
   if (destinos.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center px-6 py-20">
-        <div className="max-w-[52ch] text-center">
+      <div className="flex flex-col gap-5 p-5">
+        <div className="py-8 text-center">
           <h2 className="text-[20px] font-bold tracking-[-0.02em]">
             A doca está vazia
           </h2>
-          <p className="mt-3 text-[14px] leading-relaxed text-suave">
+          <p className="mx-auto mt-3 max-w-[52ch] text-[14px] leading-relaxed text-suave">
             Só aparece aqui o que a Expedição entregar depois de conferido e
-            lacrado. Enquanto a esteira não roda, não há saída para registrar
-            nem etiqueta para contar.
+            lacrado. É por este carrinho que a caixa chega.
           </p>
         </div>
+        <AbrirCarrinho />
+        <EntregasDoDia entregas={entregas} />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3 p-5">
+    <div className="flex flex-col gap-5 p-5">
+      <AbrirCarrinho />
+
       {destinos.map((d) => (
         <section
           key={d.modalidade_id ?? d.modalidade}
@@ -98,6 +192,8 @@ export function Doca({ destinos }: { destinos: Destino[] }) {
           </p>
         </section>
       ))}
+
+      <EntregasDoDia entregas={entregas} />
     </div>
   );
 }

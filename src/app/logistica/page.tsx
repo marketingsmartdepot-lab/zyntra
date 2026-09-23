@@ -2,11 +2,12 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Casca } from "@/components/casca";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { Doca } from "./doca";
+import { Doca, type EntregaResumo } from "./doca";
 import { EstacaoDeSaida, type SaidaResumo } from "./saida";
 import { Fechamento } from "./fechamento";
 import { BancadaDeSaida } from "./bancada";
 import { turnoDaMaquina } from "@/lib/estacao";
+import { BancadaDoca } from "./bancada-doca";
 
 export const metadata = { title: "Logística — ZYNTRA" };
 
@@ -24,6 +25,7 @@ export default async function PaginaLogistica({
   searchParams: Promise<{
     aba?: string;
     saida?: string;
+    entrega?: string;
     bipar?: string;
     falha?: string;
     fechada?: string;
@@ -35,19 +37,32 @@ export default async function PaginaLogistica({
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar?destino=/logistica");
 
-  const { aba: pedida, saida: saidaId, bipar, falha, fechada } = await searchParams;
+  const {
+    aba: pedida,
+    saida: saidaId,
+    entrega: entregaId,
+    bipar,
+    falha,
+    fechada,
+  } = await searchParams;
   const aba: Aba = ABAS.some((a) => a.chave === pedida)
     ? (pedida as Aba)
     : "doca";
 
-  const [{ data: destinos }, { data: saidas }] = await Promise.all([
-    supabase.from("doca_por_destino").select("*").order("modalidade"),
-    supabase
-      .from("saidas_resumo")
-      .select("*")
-      .order("aberta_em", { ascending: false })
-      .limit(50),
-  ]);
+  const [{ data: destinos }, { data: saidas }, { data: entregas }] =
+    await Promise.all([
+      supabase.from("doca_por_destino").select("*").order("modalidade"),
+      supabase
+        .from("saidas_resumo")
+        .select("*")
+        .order("aberta_em", { ascending: false })
+        .limit(50),
+      supabase
+        .from("entregas_doca_resumo")
+        .select("*")
+        .order("entregue_em", { ascending: false })
+        .limit(20),
+    ]);
 
   const naDoca = (destinos ?? []).reduce(
     (t: number, d: { pacotes: number }) => t + d.pacotes,
@@ -60,6 +75,11 @@ export default async function PaginaLogistica({
   // A bancada só abre para uma saída que ainda aceita bipe. Uma já fechada
   // volta para a lista em vez de mostrar um leitor que não registra nada.
   const turno = await turnoDaMaquina();
+
+  const noCarrinho =
+    bipar === "1" && entregaId
+      ? ((entregas ?? []) as EntregaResumo[]).find((e) => e.id === entregaId)
+      : null;
 
   const naBancada =
     bipar === "1" && saidaId
@@ -112,7 +132,9 @@ export default async function PaginaLogistica({
               ? "Esta saída já estava fechada."
               : falha === "modalidade_nao_encontrada"
                 ? "Este destino não existe mais."
-                : "Não foi possível concluir a operação."}
+                : falha === "sem_nome"
+                  ? "Escreva o nome de quem está levando o carrinho."
+                  : "Não foi possível concluir a operação."}
         </p>
       )}
 
@@ -123,7 +145,20 @@ export default async function PaginaLogistica({
       )}
 
       <div className="flex-1 bg-superficie">
-        {aba === "doca" && <Doca destinos={destinos ?? []} />}
+        {aba === "doca" &&
+          (noCarrinho ? (
+            <BancadaDoca
+              entregaId={noCarrinho.id}
+              codigo={noCarrinho.codigo}
+              entreguePor={noCarrinho.entregue_por}
+              jaBipados={noCarrinho.pacotes}
+            />
+          ) : (
+            <Doca
+              destinos={destinos ?? []}
+              entregas={(entregas ?? []) as EntregaResumo[]}
+            />
+          ))}
         {aba === "saida" &&
           (naBancada ? (
             <BancadaDeSaida
