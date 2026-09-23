@@ -72,11 +72,27 @@ export type LinhaPacote = {
     limite_envio_em: string | null;
     etiqueta_obtida_em: string | null;
     modalidades: { nome: string; gera_etiqueta: boolean } | null;
-    pedidos: { ref_externa: string; pack_ref: string | null }[];
+    pedidos: {
+      ref_externa: string;
+      pack_ref: string | null;
+      comprador: string | null;
+    }[];
   } | null;
   contas: {
     apelido: string;
     empresas: { nome_curto: string } | null;
+    canais: {
+      nome: string;
+      sigla: string | null;
+      cor: string | null;
+      cor_texto: string | null;
+    } | null;
   } | null;
+  notas_fiscais: {
+    situacao: "solicitada" | "autorizada" | "rejeitada" | "cancelada";
+    serie: string | null;
+    numero: number | null;
+    erro_mensagem: string | null;
+  }[];
   bloqueios: { tipo: BloqueioTipo; causa: string | null }[];
 };

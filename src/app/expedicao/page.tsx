@@ -19,8 +19,11 @@ const SELECAO = `
   id, etapa, etapa_desde, unidades_esperadas,
   envios ( ref_externa, limite_envio_em, etiqueta_obtida_em,
            modalidades ( nome, gera_etiqueta ),
-           pedidos ( ref_externa, pack_ref ) ),
-  contas ( apelido, empresas:empresa_emissora_id ( nome_curto ) ),
+           pedidos ( ref_externa, pack_ref, comprador ) ),
+  contas ( apelido,
+           empresas:empresa_emissora_id ( nome_curto ),
+           canais ( nome, sigla, cor, cor_texto ) ),
+  notas_fiscais ( situacao, serie, numero, erro_mensagem ),
   bloqueios ( tipo, causa )
 `;
 

@@ -1,17 +1,6 @@
-import type { BloqueioTipo, Etapa, LinhaPacote } from "@/lib/supabase/tipos";
 import Link from "next/link";
+import type { Etapa, LinhaPacote } from "@/lib/supabase/tipos";
 import { gerarLista } from "./listas/acoes";
-
-const ROTULO_BLOQUEIO: Record<BloqueioTipo, string> = {
-  sem_nota: "Sem nota",
-  rejeicao_fiscal: "Rejeição fiscal",
-  faturador_nao_configurado: "Faturador não configurado",
-  sku_nao_mapeado: "SKU não mapeado",
-  sem_etiqueta: "Sem etiqueta",
-  sem_estoque: "Sem estoque",
-  pedido_alterado: "Pedido alterado",
-  impressao_fora_do_sistema: "Impressão fora do sistema",
-};
 
 export function ListaPacotes({
   pacotes,
@@ -30,21 +19,24 @@ export function ListaPacotes({
         <thead>
           <tr>
             {selecionavel && <Cabecalho largura="42px"> </Cabecalho>}
-            <Cabecalho largura="188px">Código</Cabecalho>
-            <Cabecalho largura="196px">Conta / empresa</Cabecalho>
-            <Cabecalho>Itens</Cabecalho>
+            <Cabecalho largura="56px">Canal</Cabecalho>
+            <Cabecalho largura="176px">Código</Cabecalho>
+            <Cabecalho largura="178px">Cliente</Cabecalho>
+            <Cabecalho largura="158px">Conta</Cabecalho>
             <Cabecalho largura="112px">Modalidade</Cabecalho>
-            <Cabecalho largura="148px">Data limite</Cabecalho>
-            <Cabecalho largura="132px">Etiqueta</Cabecalho>
-            <Cabecalho largura="220px">Situação</Cabecalho>
+            <Cabecalho largura="142px">Data limite</Cabecalho>
+            <Cabecalho largura="158px">NF-e</Cabecalho>
+            <Cabecalho largura="150px">Etiqueta</Cabecalho>
+            <Cabecalho largura="96px">Espera</Cabecalho>
           </tr>
         </thead>
         <tbody>
           {pacotes.map((p) => {
             const envio = p.envios;
             const pedidos = envio?.pedidos ?? [];
-            const bloqueios = (p.bloqueios ?? []).filter(Boolean);
             const ehPack = pedidos.length > 1;
+            const canal = p.contas?.canais ?? null;
+            const nota = (p.notas_fiscais ?? [])[0] ?? null;
 
             return (
               <tr key={p.id} className="hover:bg-fundo">
@@ -54,11 +46,25 @@ export function ListaPacotes({
                       type="checkbox"
                       name="pacote"
                       value={p.id}
-                      aria-label={`Selecionar pacote ${pedidos[0]?.ref_externa ?? ""}`}
+                      aria-label={`Selecionar ${pedidos[0]?.ref_externa ?? "pacote"}`}
                       className="h-[15px] w-[15px] accent-[var(--color-tinta)]"
                     />
                   </Celula>
                 )}
+
+                <Celula>
+                  <span
+                    title={canal?.nome ?? "canal não identificado"}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-[7px] text-[9.5px] font-bold"
+                    style={{
+                      background: canal?.cor ?? "var(--color-linha)",
+                      color: canal?.cor_texto ?? "var(--color-suave)",
+                    }}
+                  >
+                    {canal?.sigla ?? "?"}
+                  </span>
+                </Celula>
+
                 <Celula>
                   <Link
                     href={`/expedicao?etapa=${etapa}&pacote=${p.id}`}
@@ -74,20 +80,20 @@ export function ListaPacotes({
                 </Celula>
 
                 <Celula>
+                  <span className="text-[12.5px]">
+                    {pedidos[0]?.comprador ?? (
+                      <span className="text-suave">—</span>
+                    )}
+                  </span>
+                </Celula>
+
+                <Celula>
                   <div className="text-[12.5px] font-semibold">
                     {p.contas?.apelido ?? "—"}
                   </div>
                   <div className="mt-[2px] text-[11.5px] text-suave">
                     {p.contas?.empresas?.nome_curto ?? "sem empresa emissora"}
                   </div>
-                </Celula>
-
-                <Celula>
-                  <span className="text-[12.5px]">
-                    {p.unidades_esperadas !== null
-                      ? `${p.unidades_esperadas} ${p.unidades_esperadas === 1 ? "unidade" : "unidades"}`
-                      : "—"}
-                  </span>
                 </Celula>
 
                 <Celula>
@@ -101,8 +107,39 @@ export function ListaPacotes({
                 </Celula>
 
                 <Celula>
+                  {!nota ? (
+                    <Selo tom="neutro">Sem nota</Selo>
+                  ) : nota.situacao === "autorizada" ? (
+                    <>
+                      <Selo tom="ok">Autorizada</Selo>
+                      <div className="mt-[2px] font-mono text-[11px] text-suave">
+                        série {nota.serie ?? "—"} · nº {nota.numero ?? "—"}
+                      </div>
+                    </>
+                  ) : nota.situacao === "rejeitada" ? (
+                    <>
+                      <Selo tom="critico">Rejeitada</Selo>
+                      {nota.erro_mensagem && (
+                        <div className="mt-[2px] text-[11px] text-suave">
+                          {nota.erro_mensagem}
+                        </div>
+                      )}
+                    </>
+                  ) : nota.situacao === "cancelada" ? (
+                    <Selo tom="critico">Cancelada</Selo>
+                  ) : (
+                    <Selo tom="atencao">Solicitada</Selo>
+                  )}
+                </Celula>
+
+                <Celula>
                   {envio?.modalidades && !envio.modalidades.gera_etiqueta ? (
-                    <Selo tom="neutro">Não gera</Selo>
+                    <>
+                      <Selo tom="neutro">Não gera</Selo>
+                      <div className="mt-[2px] text-[11px] text-suave">
+                        envio combinado
+                      </div>
+                    </>
                   ) : envio?.etiqueta_obtida_em ? (
                     <Selo tom="ok">Obtida</Selo>
                   ) : (
@@ -111,24 +148,7 @@ export function ListaPacotes({
                 </Celula>
 
                 <Celula>
-                  {bloqueios.length > 0 ? (
-                    <div className="flex flex-col gap-1">
-                      {bloqueios.slice(0, 2).map((b, i) => (
-                        <span key={i}>
-                          <Selo tom="critico">{ROTULO_BLOQUEIO[b.tipo]}</Selo>
-                          {b.causa && (
-                            <div className="mt-[2px] text-[11px] text-suave">
-                              {b.causa}
-                            </div>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-[11.5px] text-suave">
-                      {situacaoDaEtapa(etapa, p.etapa_desde)}
-                    </span>
-                  )}
+                  <Espera desde={p.etapa_desde} />
                 </Celula>
               </tr>
             );
@@ -160,21 +180,26 @@ export function ListaPacotes({
   );
 }
 
-function situacaoDaEtapa(etapa: Etapa, desde: string) {
+function Espera({ desde }: { desde: string }) {
   const minutos = Math.max(
     0,
     Math.round((Date.now() - new Date(desde).getTime()) / 60000),
   );
-  const tempo =
+  const longo = minutos >= 30;
+  const texto =
     minutos < 60
-      ? `há ${minutos} min`
-      : `há ${Math.floor(minutos / 60)}h ${minutos % 60}min`;
+      ? `${minutos} min`
+      : minutos < 1440
+        ? `${Math.floor(minutos / 60)}h ${minutos % 60}min`
+        : `${Math.floor(minutos / 1440)} d`;
 
-  if (etapa === "faturado") return `esperando etiqueta ${tempo}`;
-  if (etapa === "separar") return `aguardando lista ${tempo}`;
-  if (etapa === "conferir") return `na fila da bancada ${tempo}`;
-  if (etapa === "pronto") return `lacrado ${tempo}`;
-  return `nesta etapa ${tempo}`;
+  return (
+    <span
+      className={`font-mono text-[14px] font-semibold tabular-nums ${longo ? "text-atencao" : ""}`}
+    >
+      {texto}
+    </span>
+  );
 }
 
 function Prazo({ limite, agora }: { limite: string | null; agora: number }) {
