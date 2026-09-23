@@ -79,7 +79,7 @@ export default async function PaginaIntegracao({
       </p>
 
       <div className="flex flex-1 flex-col bg-superficie">
-        {aba === "contas" && <Contas />}
+        {aba === "contas" && <Contas falha={falha} />}
         {aba === "impressoras" && <Impressoras />}
         {aba === "operadores" && <Operadores falha={falha} />}
       </div>

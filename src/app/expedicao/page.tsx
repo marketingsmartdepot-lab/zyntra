@@ -39,6 +39,7 @@ export default async function PaginaExpedicao({
     impressao?: string;
     liberacao?: string;
     etiqueta?: string;
+    reprocesso?: string;
   }>;
 }) {
   const supabase = await criarClienteServidor();
@@ -55,6 +56,7 @@ export default async function PaginaExpedicao({
     impressao,
     liberacao,
     etiqueta,
+    reprocesso,
   } = await searchParams;
   const vista: Vista = pedida && ehVista(pedida) ? pedida : "separar";
   // "listas" não é etapa: a consulta de pacotes continua olhando Separar.
@@ -145,7 +147,7 @@ export default async function PaginaExpedicao({
         {vista === "listas" ? (
           <PainelListas listaId={lista} impressao={impressao} />
         ) : vista === "aberto" && !pacote ? (
-          <AbertoPorCausa />
+          <AbertoPorCausa resultado={reprocesso} />
         ) : pacote ? (
           <PainelDetalhe
             fila={(pacotes ?? []) as never[]}

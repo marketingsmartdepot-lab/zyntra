@@ -1,4 +1,5 @@
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { reprocessarCausa } from "./aberto-acoes";
 
 type Causa = {
   fonte: string;
@@ -20,6 +21,17 @@ type Pausada = {
   empresa: string | null;
 };
 
+/**
+ * Só causa fiscal tem botão. As outras ou destravam sozinhas (SKU mapeado) ou
+ * não se resolvem pedindo nota (falta de estoque, pedido alterado) — e botão
+ * que não conserta nada é pior que botão nenhum.
+ */
+const FISCAIS = new Set([
+  "rejeicao_fiscal",
+  "sem_nota",
+  "faturador_nao_configurado",
+]);
+
 const ROTULO: Record<string, string> = {
   sem_nota: "Sem nota fiscal",
   rejeicao_fiscal: "Rejeição fiscal",
@@ -35,7 +47,7 @@ const ROTULO: Record<string, string> = {
  * Agrupado por causa, não por pedido. Um NCM faltando trava trinta pedidos:
  * listados um a um, o time resolve o mesmo problema trinta vezes.
  */
-export async function AbertoPorCausa() {
+export async function AbertoPorCausa({ resultado }: { resultado?: string }) {
   const supabase = await criarClienteServidor();
 
   const [{ data: causas }, { data: pausadas }] = await Promise.all([
@@ -84,6 +96,8 @@ export async function AbertoPorCausa() {
           </span>
         </div>
       ))}
+
+      {resultado && <AvisoReprocesso resultado={resultado} />}
 
       {lista.length === 0 ? (
         <div className="flex flex-1 items-center justify-center px-6 py-20">
@@ -164,12 +178,24 @@ export async function AbertoPorCausa() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    className="shrink-0 rounded-lg bg-tinta px-3 py-[7px] text-[12.5px] font-semibold text-white"
-                  >
-                    Reprocessar {c.pacotes}
-                  </button>
+                  {FISCAIS.has(c.tipo) ? (
+                    <form action={reprocessarCausa} className="shrink-0">
+                      <input type="hidden" name="tipo" value={c.tipo} />
+                      <input type="hidden" name="codigo" value={c.codigo ?? ""} />
+                      <button
+                        type="submit"
+                        className="rounded-lg bg-tinta px-3 py-[7px] text-[12.5px] font-semibold text-white"
+                      >
+                        Pedir a nota de novo
+                      </button>
+                    </form>
+                  ) : (
+                    <span className="max-w-[26ch] shrink-0 text-right text-[11.5px] text-suave">
+                      {c.tipo === "sku_nao_mapeado"
+                        ? "destrava sozinho quando o anúncio for mapeado"
+                        : "não se resolve pedindo nota de novo"}
+                    </span>
+                  )}
                 </div>
               </article>
             ))}
@@ -177,5 +203,81 @@ export async function AbertoPorCausa() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * O que aconteceu com o lote. Contagem explícita, porque "reprocessado" sem
+ * número não diz se resolveu trinta ou nenhum.
+ */
+function AvisoReprocesso({ resultado }: { resultado: string }) {
+  if (resultado === "servico_nao_publicado") {
+    return (
+      <Faixa tom="atencao">
+        A emissão ainda não está ligada: falta conectar as contas do Mercado
+        Livre. Nenhuma nota foi pedida.
+      </Faixa>
+    );
+  }
+
+  if (resultado === "nada_a_fazer") {
+    return <Faixa tom="neutro">Não havia pedido nenhum nesta causa.</Faixa>;
+  }
+
+  if (resultado === "sem_sessao") {
+    return <Faixa tom="critico">Sua sessão expirou. Entre de novo.</Faixa>;
+  }
+
+  const [ok, falhou, motivo] = resultado.split("-");
+  const autorizadas = Number(ok);
+  const rejeitadas = Number(falhou);
+
+  if (Number.isNaN(autorizadas) || Number.isNaN(rejeitadas)) {
+    return <Faixa tom="critico">Não foi possível reprocessar.</Faixa>;
+  }
+
+  return (
+    <Faixa tom={rejeitadas > 0 ? "atencao" : "ok"}>
+      {autorizadas > 0 && (
+        <>
+          <b>{autorizadas}</b>
+          {autorizadas === 1 ? " nota autorizada" : " notas autorizadas"}
+        </>
+      )}
+      {autorizadas > 0 && rejeitadas > 0 && " · "}
+      {rejeitadas > 0 && (
+        <>
+          <b>{rejeitadas}</b>
+          {rejeitadas === 1 ? " continua parada" : " continuam paradas"}
+          {motivo && ` (${decodeURIComponent(motivo)})`}
+        </>
+      )}
+    </Faixa>
+  );
+}
+
+function Faixa({
+  tom,
+  children,
+}: {
+  tom: "ok" | "atencao" | "critico" | "neutro";
+  children: React.ReactNode;
+}) {
+  const estilo =
+    tom === "ok"
+      ? "border-ok-linha bg-ok-bg text-ok"
+      : tom === "atencao"
+        ? "border-atencao-linha bg-atencao-bg text-atencao"
+        : tom === "critico"
+          ? "border-critico-linha bg-critico-bg text-critico"
+          : "border-linha bg-fundo text-suave";
+
+  return (
+    <p
+      role="status"
+      className={`m-0 border-b px-5 py-[10px] text-[12.5px] font-semibold ${estilo}`}
+    >
+      {children}
+    </p>
   );
 }

@@ -1,4 +1,5 @@
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { alternarEmissao, retomarEmissao } from "./contas-acoes";
 
 type Tom = "ok" | "atencao" | "critico" | "neutro";
 
@@ -15,6 +16,7 @@ type LinhaConta = {
   ref_externa: string | null;
   situacao: string;
   entra_na_esteira: boolean;
+  emissao_automatica: boolean;
   emissao_pausada_em: string | null;
   emissao_pausa_motivo: string | null;
   canais: { nome: string; entra_na_esteira: boolean } | null;
@@ -26,14 +28,14 @@ type LinhaConta = {
   pools_estoque: { nome: string } | null;
 };
 
-export async function Contas() {
+export async function Contas({ falha }: { falha?: string }) {
   const supabase = await criarClienteServidor();
 
   const { data, error } = await supabase
     .from("contas")
     .select(
       `id, apelido, ref_externa, situacao, entra_na_esteira,
-       emissao_pausada_em, emissao_pausa_motivo,
+       emissao_automatica, emissao_pausada_em, emissao_pausa_motivo,
        canais ( nome, entra_na_esteira ),
        empresas:empresa_emissora_id ( razao_social, serie_nfe, faturador_situacao ),
        pools_estoque:pool_estoque_id ( nome )`,
@@ -62,7 +64,10 @@ export async function Contas() {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="flex flex-col">
+      {falha && <Resultado resultado={falha} />}
+
+      <div className="overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
           <tr>
@@ -72,6 +77,7 @@ export async function Contas() {
               "Empresa emissora",
               "Estoque",
               "Faturador",
+              "Emissão automática",
               "Série",
               "Esteira",
               "Situação",
@@ -127,6 +133,15 @@ export async function Contas() {
                   )}
                 </Celula>
                 <Celula>
+                  {fora ? (
+                    <span className="text-[11.5px] text-suave">
+                      não se aplica
+                    </span>
+                  ) : (
+                    <ChaveDaEmissao conta={c} pausada={pausada} />
+                  )}
+                </Celula>
+                <Celula>
                   <span className="font-mono">
                     {c.empresas?.serie_nfe ?? "—"}
                   </span>
@@ -154,7 +169,104 @@ export async function Contas() {
           })}
         </tbody>
       </table>
+      </div>
     </div>
+  );
+}
+
+/**
+ * A chave da emissão de uma conta.
+ *
+ * Desligada é o estado seguro e é como toda conta nasce. Emitir nota é
+ * irreversível, então ligar é uma decisão consciente, uma conta por vez.
+ */
+function ChaveDaEmissao({
+  conta,
+  pausada,
+}: {
+  conta: LinhaConta;
+  pausada: boolean;
+}) {
+  if (pausada) {
+    return (
+      <div>
+        <Selo tom="critico">Pausada pelo disjuntor</Selo>
+        <form action={retomarEmissao} className="mt-[6px]">
+          <input type="hidden" name="conta" value={conta.id} />
+          <button
+            type="submit"
+            className="rounded-lg border border-critico-linha px-3 py-[6px] text-[12px] font-semibold text-critico"
+          >
+            Retomar emissão
+          </button>
+        </form>
+        <p className="m-0 mt-[5px] max-w-[30ch] text-[11px] text-suave">
+          Conserte a causa antes. Retomar sem consertar faz a conta pausar de
+          novo em minutos.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form action={alternarEmissao} className="flex items-center gap-2">
+      <input type="hidden" name="conta" value={conta.id} />
+      <input
+        type="hidden"
+        name="ligar"
+        value={conta.emissao_automatica ? "0" : "1"}
+      />
+      {conta.emissao_automatica ? (
+        <>
+          <Selo tom="ok">Ligada</Selo>
+          <button
+            type="submit"
+            className="rounded-lg border border-linha px-3 py-[6px] text-[12px] font-semibold text-suave"
+          >
+            Desligar
+          </button>
+        </>
+      ) : (
+        <>
+          <Selo tom="neutro">Desligada</Selo>
+          <button
+            type="submit"
+            className="rounded-lg bg-tinta px-3 py-[6px] text-[12px] font-semibold text-white"
+          >
+            Ligar
+          </button>
+        </>
+      )}
+    </form>
+  );
+}
+
+function Resultado({ resultado }: { resultado: string }) {
+  const bom = ["emissao_ligada", "emissao_desligada", "emissao_retomada"];
+  const texto: Record<string, string> = {
+    emissao_ligada:
+      "Emissão automática ligada nesta conta. Acompanhe as primeiras notas antes de ligar a próxima.",
+    emissao_desligada: "Emissão automática desligada nesta conta.",
+    emissao_retomada:
+      "Emissão retomada. Se a causa não foi resolvida, o disjuntor pausa de novo.",
+    nao_estava_pausada: "Esta conta não estava pausada.",
+    sem_permissao: "Só líder ou administrador faz isso.",
+    erro: "Não foi possível concluir.",
+  };
+
+  const ok = bom.includes(resultado);
+
+  return (
+    <p
+      role="status"
+      className={`m-0 border-b px-5 py-[10px] text-[12.5px] font-semibold ${
+        ok
+          ? "border-ok-linha bg-ok-bg text-ok"
+          : "border-critico-linha bg-critico-bg text-critico"
+      }`}
+    >
+      {texto[resultado] ?? texto.erro}
+    </p>
   );
 }
 
