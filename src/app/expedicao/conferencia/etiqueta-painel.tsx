@@ -1,10 +1,13 @@
 import { imprimirEtiqueta } from "../etiqueta";
+import { ConfirmarEtiqueta } from "./confirmar-etiqueta";
 
 export type ImpressaoDaEtiqueta = {
   situacao: string;
   erro: string | null;
   enviada_em: string;
   reimpressao: boolean;
+  confirmada_em: string | null;
+  confirmada_codigo: string | null;
 };
 
 /**
@@ -21,16 +24,24 @@ export function PainelEtiqueta({
   pacoteId,
   impressoes,
   resultado,
+  operadorId,
 }: {
   pacoteId: string;
   impressoes: ImpressaoDaEtiqueta[];
   resultado?: string;
+  operadorId: string | null;
 }) {
   const jaSaiu = impressoes.some((i) => i.situacao === "impressa");
   const naFila = impressoes.some(
     (i) => i.situacao === "pendente" || i.situacao === "entregue_ao_agente",
   );
   const ultimoErro = impressoes.find((i) => i.situacao === "erro");
+  const confirmada = impressoes.find((i) => i.confirmada_em !== null);
+  // Só há o que confirmar quando a impressora aceitou o comando e ninguém
+  // bipou ainda.
+  const esperandoBipe = impressoes.some(
+    (i) => i.situacao === "impressa" && i.confirmada_em === null,
+  );
   const precisaMotivo =
     jaSaiu || resultado === "motivo_reimpressao_obrigatorio";
 
@@ -40,10 +51,19 @@ export function PainelEtiqueta({
         <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em]">
           Etiqueta de envio
         </h3>
+        {/*
+          A espera vem antes da confirmação: numa reimpressão a etiqueta
+          antiga está confirmada e a nova não, e dizer "confirmada" ali seria
+          mentira sobre o papel que está na mesa agora.
+        */}
         {naFila ? (
           <Selo tom="atencao">Na fila da impressora</Selo>
+        ) : esperandoBipe ? (
+          <Selo tom="atencao">Esperando confirmação</Selo>
+        ) : confirmada ? (
+          <Selo tom="ok">Confirmada na mão</Selo>
         ) : jaSaiu ? (
-          <Selo tom="ok">Já impressa</Selo>
+          <Selo tom="ok">Comando aceito</Selo>
         ) : (
           <Selo tom="neutro">Não impressa</Selo>
         )}
@@ -61,6 +81,27 @@ export function PainelEtiqueta({
         <p className="m-0 border-b border-linha px-4 py-[10px] text-[12.5px] text-critico">
           A última tentativa falhou na impressora: {ultimoErro.erro}
         </p>
+      )}
+
+      {confirmada && !esperandoBipe && (
+        <p className="m-0 border-b border-linha px-4 py-[10px] text-[12.5px] text-suave">
+          Etiqueta bipada em{" "}
+          {new Date(confirmada.confirmada_em!).toLocaleString("pt-BR", {
+            dateStyle: "short",
+            timeStyle: "short",
+            timeZone: "America/Sao_Paulo",
+          })}
+          {confirmada.confirmada_codigo && (
+            <>
+              {" · "}
+              <span className="font-mono">{confirmada.confirmada_codigo}</span>
+            </>
+          )}
+        </p>
+      )}
+
+      {esperandoBipe && (
+        <ConfirmarEtiqueta pacoteId={pacoteId} operadorId={operadorId} />
       )}
 
       <form

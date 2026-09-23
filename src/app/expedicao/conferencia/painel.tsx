@@ -138,7 +138,9 @@ async function Detalhe({
   // imprimir, ou reimprimir exigindo motivo.
   const { data: impressoesEtiqueta } = await supabase
     .from("impressoes")
-    .select("situacao, erro, enviada_em, reimpressao")
+    .select(
+      "situacao, erro, enviada_em, reimpressao, confirmada_em, confirmada_codigo",
+    )
     .eq("pacote_id", pacote.id)
     .eq("tipo", "etiqueta")
     .order("enviada_em", { ascending: false });
@@ -264,6 +266,7 @@ async function Detalhe({
           pacoteId={pacote.id}
           impressoes={(impressoesEtiqueta ?? []) as ImpressaoDaEtiqueta[]}
           resultado={etiqueta}
+          operadorId={turno?.operadorId ?? null}
         />
       )}
 
