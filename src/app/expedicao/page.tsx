@@ -9,6 +9,7 @@ import {
   type LinhaPacote,
 } from "@/lib/supabase/tipos";
 import { ListaPacotes } from "./lista";
+import { PainelConferencia } from "./conferencia/painel";
 
 export const metadata = { title: "Expedição — ZYNTRA" };
 
@@ -24,7 +25,7 @@ const SELECAO = `
 export default async function PaginaExpedicao({
   searchParams,
 }: {
-  searchParams: Promise<{ etapa?: string }>;
+  searchParams: Promise<{ etapa?: string; pacote?: string }>;
 }) {
   const supabase = await criarClienteServidor();
   const {
@@ -32,7 +33,7 @@ export default async function PaginaExpedicao({
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar?destino=/expedicao");
 
-  const { etapa: pedida } = await searchParams;
+  const { etapa: pedida, pacote } = await searchParams;
   const etapaAtiva: Etapa =
     pedida && ehEtapaDaEsteira(pedida) ? pedida : "separar";
 
@@ -92,8 +93,13 @@ export default async function PaginaExpedicao({
         </span>
       </div>
 
-      <div className="flex-1 bg-superficie">
-        {error ? (
+      <div className="flex flex-1 flex-col bg-superficie">
+        {etapaAtiva === "conferir" ? (
+          <PainelConferencia
+            fila={(pacotes ?? []) as never[]}
+            pacoteId={pacote}
+          />
+        ) : error ? (
           <Vazio
             titulo="Não foi possível ler a esteira"
             texto={error.message}
