@@ -1,4 +1,4 @@
-import { Assinatura, Logotipo, Rodape, SeloZ } from "@/components/marca";
+import { Assinatura, Logotipo, Rodape, SimboloZ } from "@/components/marca";
 import { FormularioEntrada } from "./formulario";
 
 export const metadata = { title: "Entrar — ZYNTRA" };
@@ -34,7 +34,7 @@ export default async function PaginaEntrar({
       <div className="relative flex flex-1 items-center justify-center px-6 py-16">
         <div className="flex flex-col items-center gap-14 lg:flex-row lg:items-center lg:gap-[84px]">
           <div className="w-full max-w-[412px]">
-            <SeloZ className="mb-7 block h-[70px] w-[70px]" />
+            <SimboloZ className="mb-7 block h-[62px] w-[62px]" />
             <Logotipo className="block h-[52px] w-auto text-offwhite" />
             <Assinatura className="mt-[26px]" />
           </div>

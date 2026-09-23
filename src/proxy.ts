@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 /** Rotas que podem ser abertas sem sessão. */
 const PUBLICAS = ["/entrar", "/auth"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

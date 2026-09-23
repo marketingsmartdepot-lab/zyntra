@@ -44,7 +44,7 @@ function BotaoAba({
       role="tab"
       aria-selected={ativa}
       onClick={onClick}
-      className={`flex-1 rounded-lg px-2 py-[9px] text-[13px] font-semibold transition-colors ${
+      className={`flex-1 whitespace-nowrap rounded-lg px-2 py-[9px] text-[12.5px] font-semibold transition-colors ${
         ativa
           ? "bg-champanhe text-grafite"
           : "text-cinza-2 hover:text-offwhite"
