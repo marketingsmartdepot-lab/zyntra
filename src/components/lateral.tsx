@@ -4,9 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { Logotipo, SimboloZ } from "@/components/marca";
 
-export type Frente = "expedicao" | "logistica" | "integracao";
+export type Frente = "expedicao" | "logistica" | "integracao" | "painel";
 
 const FRENTES: { chave: Frente; rotulo: string; href: string }[] = [
+  { chave: "painel", rotulo: "Painel", href: "/painel" },
   { chave: "expedicao", rotulo: "Expedição", href: "/expedicao" },
   { chave: "logistica", rotulo: "Logística", href: "/logistica" },
   { chave: "integracao", rotulo: "Integração", href: "/integracao" },
@@ -174,6 +175,14 @@ function Icone({ frente }: { frente: Frente }) {
     className: "shrink-0",
   };
 
+  if (frente === "painel") {
+    return (
+      <svg {...comum}>
+        <path d="M3 3v18h18" />
+        <path d="M7 15l4-5 3 3 5-7" />
+      </svg>
+    );
+  }
   if (frente === "expedicao") {
     return (
       <svg {...comum}>

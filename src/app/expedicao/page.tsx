@@ -12,6 +12,7 @@ import {
 import { ListaPacotes } from "./lista";
 import { PainelDetalhe } from "./conferencia/painel";
 import { PainelListas } from "./listas/painel";
+import { AbertoPorCausa } from "./aberto";
 
 export const metadata = { title: "Expedição — ZYNTRA" };
 
@@ -127,6 +128,8 @@ export default async function PaginaExpedicao({
       <div className="flex flex-1 flex-col bg-superficie">
         {vista === "listas" ? (
           <PainelListas listaId={lista} />
+        ) : vista === "aberto" && !pacote ? (
+          <AbertoPorCausa />
         ) : pacote ? (
           <PainelDetalhe
             fila={(pacotes ?? []) as never[]}
