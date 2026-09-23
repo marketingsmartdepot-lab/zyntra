@@ -4,12 +4,14 @@ import { Casca } from "@/components/casca";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import {
   ABAS_EXPEDICAO,
-  ehEtapaDaEsteira,
+  ehVista,
   type Etapa,
   type LinhaPacote,
+  type Vista,
 } from "@/lib/supabase/tipos";
 import { ListaPacotes } from "./lista";
 import { PainelConferencia } from "./conferencia/painel";
+import { PainelListas } from "./listas/painel";
 
 export const metadata = { title: "Expedição — ZYNTRA" };
 
@@ -25,7 +27,7 @@ const SELECAO = `
 export default async function PaginaExpedicao({
   searchParams,
 }: {
-  searchParams: Promise<{ etapa?: string; pacote?: string }>;
+  searchParams: Promise<{ etapa?: string; pacote?: string; lista?: string; falha?: string }>;
 }) {
   const supabase = await criarClienteServidor();
   const {
@@ -33,9 +35,10 @@ export default async function PaginaExpedicao({
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar?destino=/expedicao");
 
-  const { etapa: pedida, pacote } = await searchParams;
-  const etapaAtiva: Etapa =
-    pedida && ehEtapaDaEsteira(pedida) ? pedida : "separar";
+  const { etapa: pedida, pacote, lista, falha } = await searchParams;
+  const vista: Vista = pedida && ehVista(pedida) ? pedida : "separar";
+  // "listas" não é etapa: a consulta de pacotes continua olhando Separar.
+  const etapaAtiva: Etapa = vista === "listas" ? "separar" : vista;
 
   // Contagem por etapa numa consulta só, em vez de uma por aba.
   const { data: contagens } = await supabase
@@ -47,6 +50,11 @@ export default async function PaginaExpedicao({
   for (const linha of contagens ?? []) {
     porEtapa.set(linha.etapa, (porEtapa.get(linha.etapa) ?? 0) + 1);
   }
+
+  const { count: listasAbertas } = await supabase
+    .from("listas_separacao")
+    .select("id", { count: "exact", head: true })
+    .in("situacao", ["aguardando", "em_execucao"]);
 
   const { data: pacotes, error } = await supabase
     .from("pacotes")
@@ -67,9 +75,16 @@ export default async function PaginaExpedicao({
             etapa={a.etapa}
             rotulo={a.rotulo}
             contagem={porEtapa.get(a.etapa) ?? 0}
-            ativa={etapaAtiva === a.etapa}
+            ativa={vista === a.etapa}
           />
         ))}
+
+        <AbaVista
+          chave="listas"
+          rotulo="Lista de separação"
+          contagem={listasAbertas ?? 0}
+          ativa={vista === "listas"}
+        />
 
         <span className="my-[15px] w-px shrink-0 bg-linha" />
 
@@ -77,7 +92,7 @@ export default async function PaginaExpedicao({
           etapa="retido"
           rotulo="Retidos"
           contagem={porEtapa.get("retido") ?? 0}
-          ativa={etapaAtiva === "retido"}
+          ativa={vista === "retido"}
           foraDaEsteira
         />
 
@@ -85,7 +100,16 @@ export default async function PaginaExpedicao({
       </nav>
 
       <div className="flex shrink-0 items-center gap-2 border-b border-linha bg-fundo px-5 py-[11px] text-[12.5px] text-suave">
-        <Explicacao etapa={etapaAtiva} />
+        <Explicacao vista={vista} />
+        {falha && (
+          <span className="rounded-md border border-critico-linha bg-critico-bg px-[9px] py-[3px] font-semibold text-critico">
+            {falha === "todos_ja_em_lista"
+              ? "Esses pacotes já estão numa lista ativa."
+              : falha === "pacote_fora_de_separar"
+                ? "Só pacote em Separar entra em lista."
+                : "Não foi possível gerar a lista."}
+          </span>
+        )}
         <span className="flex-1" />
         <span>
           <b className="font-semibold text-tinta">{pacotes?.length ?? 0}</b>{" "}
@@ -94,7 +118,9 @@ export default async function PaginaExpedicao({
       </div>
 
       <div className="flex flex-1 flex-col bg-superficie">
-        {etapaAtiva === "conferir" ? (
+        {vista === "listas" ? (
+          <PainelListas listaId={lista} />
+        ) : vista === "conferir" ? (
           <PainelConferencia
             fila={(pacotes ?? []) as never[]}
             pacoteId={pacote}
@@ -111,6 +137,7 @@ export default async function PaginaExpedicao({
           <ListaPacotes
             pacotes={pacotes as unknown as LinhaPacote[]}
             etapa={etapaAtiva}
+            selecionavel={vista === "separar"}
           />
         )}
       </div>
@@ -165,8 +192,43 @@ function Aba({
   );
 }
 
-function Explicacao({ etapa }: { etapa: Etapa }) {
-  const texto: Partial<Record<Etapa, string>> = {
+function AbaVista({
+  chave,
+  rotulo,
+  contagem,
+  ativa,
+}: {
+  chave: string;
+  rotulo: string;
+  contagem: number;
+  ativa: boolean;
+}) {
+  return (
+    <Link
+      href={`/expedicao?etapa=${chave}`}
+      aria-current={ativa ? "page" : undefined}
+      className={`flex shrink-0 flex-col gap-[2px] border-b-[3px] py-[13px] pb-[14px] no-underline ${
+        ativa ? "border-tinta text-tinta" : "border-transparent text-suave"
+      }`}
+    >
+      <span className="text-[10.5px] font-semibold uppercase tracking-[0.13em]">
+        {rotulo}
+      </span>
+      <span
+        className={`text-[25px] font-bold leading-none tracking-[-0.02em] tabular-nums ${
+          ativa ? "text-tinta" : "text-[#43464D]"
+        }`}
+      >
+        {contagem}
+      </span>
+    </Link>
+  );
+}
+
+function Explicacao({ vista }: { vista: Vista }) {
+  const texto: Partial<Record<Vista, string>> = {
+    listas:
+      "A lista do corredor, consolidada por SKU. Pode cruzar contas e empresas.",
     aberto:
       "Só faturamento e SKU — o que a gente resolve no cadastro e reprocessa.",
     faturado:
@@ -177,7 +239,7 @@ function Explicacao({ etapa }: { etapa: Etapa }) {
     retido:
       "Fora da esteira: cancelamento, endereço trocado, modalidade alterada pelo canal.",
   };
-  return <span>{texto[etapa]}</span>;
+  return <span>{texto[vista]}</span>;
 }
 
 function vazioDaEtapa(etapa: Etapa) {

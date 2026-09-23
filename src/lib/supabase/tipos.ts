@@ -46,9 +46,18 @@ export const ABAS_EXPEDICAO = [
 
 export type EtapaAba = (typeof ABAS_EXPEDICAO)[number]["etapa"];
 
-export function ehEtapaDaEsteira(v: string): v is EtapaAba | "retido" {
+/**
+ * O que a aba mostra. `listas` não é etapa: um pacote nunca está "em listas",
+ * ele está em Separar e por acaso pertence a uma lista. A aba existe porque o
+ * separador precisa dela, não porque o pedido mudou de lugar.
+ */
+export type Vista = EtapaAba | "retido" | "listas";
+
+export function ehVista(v: string): v is Vista {
   return (
-    v === "retido" || ABAS_EXPEDICAO.some((a) => (a.etapa as string) === v)
+    v === "retido" ||
+    v === "listas" ||
+    ABAS_EXPEDICAO.some((a) => (a.etapa as string) === v)
   );
 }
 

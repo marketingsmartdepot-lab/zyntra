@@ -1,4 +1,5 @@
 import type { BloqueioTipo, Etapa, LinhaPacote } from "@/lib/supabase/tipos";
+import { gerarLista } from "./listas/acoes";
 
 const ROTULO_BLOQUEIO: Record<BloqueioTipo, string> = {
   sem_nota: "Sem nota",
@@ -14,17 +15,20 @@ const ROTULO_BLOQUEIO: Record<BloqueioTipo, string> = {
 export function ListaPacotes({
   pacotes,
   etapa,
+  selecionavel,
 }: {
   pacotes: LinhaPacote[];
   etapa: Etapa;
+  selecionavel?: boolean;
 }) {
   const agora = Date.now();
 
-  return (
+  const tabela = (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
           <tr>
+            {selecionavel && <Cabecalho largura="42px"> </Cabecalho>}
             <Cabecalho largura="188px">Código</Cabecalho>
             <Cabecalho largura="196px">Conta / empresa</Cabecalho>
             <Cabecalho>Itens</Cabecalho>
@@ -43,6 +47,17 @@ export function ListaPacotes({
 
             return (
               <tr key={p.id}>
+                {selecionavel && (
+                  <Celula>
+                    <input
+                      type="checkbox"
+                      name="pacote"
+                      value={p.id}
+                      aria-label={`Selecionar pacote ${pedidos[0]?.ref_externa ?? ""}`}
+                      className="h-[15px] w-[15px] accent-[var(--color-tinta)]"
+                    />
+                  </Celula>
+                )}
                 <Celula>
                   <div className="font-mono text-[12.5px] font-medium tracking-[-0.02em]">
                     {pedidos[0]?.ref_externa ?? envio?.ref_externa ?? "—"}
@@ -117,6 +132,27 @@ export function ListaPacotes({
         </tbody>
       </table>
     </div>
+  );
+
+  if (!selecionavel) return tabela;
+
+  return (
+    <form action={gerarLista} className="flex flex-1 flex-col">
+      {tabela}
+      <div className="mt-auto flex items-center gap-3 border-t border-linha bg-fundo px-5 py-3">
+        <span className="text-[12.5px] text-suave">
+          Marque os pacotes e gere a lista. Ela pode cruzar contas e empresas —
+          quem anda pelo corredor não quer uma lista por CNPJ.
+        </span>
+        <span className="flex-1" />
+        <button
+          type="submit"
+          className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
+        >
+          Gerar lista de separação
+        </button>
+      </div>
+    </form>
   );
 }
 
