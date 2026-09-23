@@ -4,6 +4,12 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { criarClienteNavegador } from "@/lib/supabase/client";
 import { concluirConferencia } from "./acoes";
+import {
+  AbrirDivergencia,
+  LiberarDivergencia,
+  type DivergenciaAberta,
+  type Lider,
+} from "./divergencia";
 
 export type ItemConferido = {
   sku_id: string;
@@ -37,10 +43,22 @@ export function Bancada({
   conferenciaId,
   itensIniciais,
   proximoPacote,
+  pacoteId,
+  divergencia,
+  jaLiberada,
+  lideres,
+  liberacao,
 }: {
   conferenciaId: string;
   itensIniciais: ItemConferido[];
   proximoPacote: string | null;
+  pacoteId: string;
+  /** Divergência aberta deste pacote. Enquanto houver, a conferência não fecha. */
+  divergencia: DivergenciaAberta | null;
+  /** Já houve liberação de líder nesta conferência: pode fechar com diferença. */
+  jaLiberada: boolean;
+  lideres: Lider[];
+  liberacao?: string;
 }) {
   const router = useRouter();
   const campo = useRef<HTMLInputElement>(null);
@@ -61,6 +79,9 @@ export function Bancada({
   const esperadas = itens.reduce((t, i) => t + i.quantidade_esperada, 0);
   const faltam = esperadas - lidas;
   const completo = faltam <= 0 && esperadas > 0;
+  // O líder já assumiu a diferença: o banco deixa fechar, a tela também tem
+  // que deixar. Senão a liberação não serve para nada.
+  const podeFechar = (completo || jaLiberada) && !divergencia;
 
   async function bipar(evento: React.FormEvent) {
     evento.preventDefault();
@@ -168,6 +189,22 @@ export function Bancada({
         </p>
       )}
 
+      {divergencia && (
+        <LiberarDivergencia
+          divergencia={divergencia}
+          pacoteId={pacoteId}
+          lideres={lideres}
+          resultado={liberacao}
+        />
+      )}
+
+      {liberacao === "ok" && !divergencia && (
+        <p className="mx-6 mb-4 rounded-lg border border-ok-linha bg-ok-bg px-4 py-3 text-[13px] font-semibold text-ok">
+          Divergência liberada pelo líder. Este pacote já pode ser finalizado
+          com a diferença.
+        </p>
+      )}
+
       {ultima && <Retorno1 retorno={ultima} />}
 
       <table className="w-full border-collapse">
@@ -236,12 +273,15 @@ export function Bancada({
           fechar a conferência
         </span>
         <span className="flex-1" />
+        {!completo && !divergencia && !jaLiberada && (
+          <AbrirDivergencia conferenciaId={conferenciaId} />
+        )}
         <button
           type="button"
           onClick={finalizar}
-          disabled={!completo || finalizando}
+          disabled={!podeFechar || finalizando}
           className={`rounded-[10px] px-[22px] py-[14px] text-[15px] font-semibold ${
-            completo
+            podeFechar
               ? "bg-tinta text-white"
               : "cursor-not-allowed bg-[#DEDAD0] text-[#8C8880]"
           }`}
@@ -249,7 +289,9 @@ export function Bancada({
           {finalizando ? "Finalizando…" : "Finalizar e próximo"}
           {!completo && (
             <span className="block text-[11.5px] font-medium">
-              faltam {faltam} {faltam === 1 ? "unidade" : "unidades"}
+              {jaLiberada && !divergencia
+                ? `fecha com ${faltam} a menos, liberado`
+                : `faltam ${faltam} ${faltam === 1 ? "unidade" : "unidades"}`}
             </span>
           )}
         </button>

@@ -3,6 +3,7 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import type { Etapa } from "@/lib/supabase/tipos";
 import { Bancada, type ItemConferido } from "./bancada";
 import { iniciarConferencia } from "./acoes";
+import type { DivergenciaAberta, Lider } from "./divergencia";
 
 type PacoteNaFila = {
   id: string;
@@ -28,10 +29,12 @@ export async function PainelDetalhe({
   fila,
   pacoteId,
   etapa,
+  liberacao,
 }: {
   fila: PacoteNaFila[];
   pacoteId: string;
   etapa: Etapa;
+  liberacao?: string;
 }) {
   const selecionado = fila.find((p) => p.id === pacoteId) ?? null;
 
@@ -88,7 +91,12 @@ export async function PainelDetalhe({
 
       <section className="flex min-w-0 flex-1 flex-col">
         {selecionado ? (
-          <Detalhe pacote={selecionado} fila={fila} etapa={etapa} />
+          <Detalhe
+            pacote={selecionado}
+            fila={fila}
+            etapa={etapa}
+            liberacao={liberacao}
+          />
         ) : (
           <div className="flex flex-1 items-center justify-center px-6 py-20">
             <p className="max-w-[44ch] text-center text-[14px] leading-relaxed text-suave">
@@ -105,10 +113,12 @@ async function Detalhe({
   pacote,
   fila,
   etapa,
+  liberacao,
 }: {
   pacote: PacoteNaFila;
   fila: PacoteNaFila[];
   etapa: Etapa;
+  liberacao?: string;
 }) {
   const supabase = await criarClienteServidor();
   const pedidos = pacote.envios?.pedidos ?? [];
@@ -130,6 +140,36 @@ async function Detalhe({
 
   const conferencia = conferencias?.[0];
   const proximo = fila.find((p) => p.id !== pacote.id)?.id ?? null;
+
+  // Divergência aberta e quem pode liberar. Buscados juntos: a bancada precisa
+  // dos dois ao mesmo tempo ou de nenhum.
+  let divergencia: DivergenciaAberta | null = null;
+  let jaLiberada = false;
+  let lideres: Lider[] = [];
+
+  if (conferencia) {
+    const [{ data: divs }, { data: chefes }] = await Promise.all([
+      supabase
+        .from("divergencias")
+        .select("id, tipo, detalhe, aberta_em, liberada_em")
+        .eq("conferencia_id", conferencia.id)
+        .order("aberta_em"),
+      supabase
+        .from("operadores")
+        .select("id, nome")
+        .eq("papel", "lider")
+        .eq("ativo", true)
+        .not("pin_hash", "is", null)
+        .order("nome"),
+    ]);
+    const todas = (divs ?? []) as (DivergenciaAberta & {
+      liberada_em: string | null;
+    })[];
+    divergencia = todas.find((d) => d.liberada_em === null) ?? null;
+    // Uma divergência já liberada é a autorização para fechar com diferença.
+    jaLiberada = todas.some((d) => d.liberada_em !== null);
+    lideres = (chefes ?? []) as Lider[];
+  }
 
   let itens: ItemConferido[] = [];
   if (conferencia) {
@@ -205,6 +245,11 @@ async function Detalhe({
             conferenciaId={conferencia.id}
             itensIniciais={itens}
             proximoPacote={proximo}
+            pacoteId={pacote.id}
+            divergencia={divergencia}
+            jaLiberada={jaLiberada}
+            lideres={lideres}
+            liberacao={liberacao}
           />
         ) : (
           <IniciarBancada pacoteId={pacote.id} />

@@ -37,6 +37,7 @@ export default async function PaginaExpedicao({
     lista?: string;
     falha?: string;
     impressao?: string;
+    liberacao?: string;
   }>;
 }) {
   const supabase = await criarClienteServidor();
@@ -45,7 +46,8 @@ export default async function PaginaExpedicao({
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar?destino=/expedicao");
 
-  const { etapa: pedida, pacote, lista, falha, impressao } = await searchParams;
+  const { etapa: pedida, pacote, lista, falha, impressao, liberacao } =
+    await searchParams;
   const vista: Vista = pedida && ehVista(pedida) ? pedida : "separar";
   // "listas" não é etapa: a consulta de pacotes continua olhando Separar.
   const etapaAtiva: Etapa = vista === "listas" ? "separar" : vista;
@@ -141,6 +143,7 @@ export default async function PaginaExpedicao({
             fila={(pacotes ?? []) as never[]}
             pacoteId={pacote}
             etapa={etapaAtiva}
+            liberacao={liberacao}
           />
         ) : error ? (
           <Vazio
