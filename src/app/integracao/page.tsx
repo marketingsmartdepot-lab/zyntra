@@ -60,7 +60,7 @@ export default async function PaginaIntegracao() {
             texto="Conectar a primeira conta do Mercado Livre depende das credenciais da aplicação ML da Smart Depot — client id e secret. Enquanto elas não existirem, esta tela fica honestamente vazia."
           />
         ) : (
-          <Tabela contas={contas} />
+          <Tabela contas={contas as unknown as LinhaConta[]} />
         )}
       </div>
     </Casca>

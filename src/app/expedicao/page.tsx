@@ -1,49 +1,220 @@
 import { redirect } from "next/navigation";
-import { Abas, Casca } from "@/components/casca";
+import Link from "next/link";
+import { Casca } from "@/components/casca";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import {
+  ABAS_EXPEDICAO,
+  ehEtapaDaEsteira,
+  type Etapa,
+  type LinhaPacote,
+} from "@/lib/supabase/tipos";
+import { ListaPacotes } from "./lista";
 
 export const metadata = { title: "Expedição — ZYNTRA" };
 
-const ABAS = [
-  { rotulo: "Aberto", tom: "critico" as const },
-  { rotulo: "Faturado", tom: "atencao" as const },
-  { rotulo: "Separar" },
-  { rotulo: "Lista de separação" },
-  { rotulo: "Conferir" },
-  { rotulo: "Pronto pra envio" },
-  { rotulo: "Retidos", tom: "atencao" as const },
-];
+const SELECAO = `
+  id, etapa, etapa_desde, unidades_esperadas,
+  envios ( ref_externa, limite_envio_em, etiqueta_obtida_em,
+           modalidades ( nome, gera_etiqueta ),
+           pedidos ( ref_externa, pack_ref ) ),
+  contas ( apelido, empresas:empresa_emissora_id ( nome_curto ) ),
+  bloqueios ( tipo, causa )
+`;
 
-export default async function PaginaExpedicao() {
+export default async function PaginaExpedicao({
+  searchParams,
+}: {
+  searchParams: Promise<{ etapa?: string }>;
+}) {
   const supabase = await criarClienteServidor();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user) redirect("/entrar?destino=/expedicao");
+
+  const { etapa: pedida } = await searchParams;
+  const etapaAtiva: Etapa =
+    pedida && ehEtapaDaEsteira(pedida) ? pedida : "separar";
+
+  // Contagem por etapa numa consulta só, em vez de uma por aba.
+  const { data: contagens } = await supabase
+    .from("pacotes")
+    .select("etapa")
+    .neq("etapa", "encerrado");
+
+  const porEtapa = new Map<string, number>();
+  for (const linha of contagens ?? []) {
+    porEtapa.set(linha.etapa, (porEtapa.get(linha.etapa) ?? 0) + 1);
+  }
+
+  const { data: pacotes, error } = await supabase
+    .from("pacotes")
+    .select(SELECAO)
+    .eq("etapa", etapaAtiva)
+    .order("etapa_desde", { ascending: true })
+    .limit(200);
 
   return (
     <Casca frente="expedicao" email={user.email ?? "sem e-mail"}>
-      <Abas itens={ABAS} ativa="Separar" />
+      <nav
+        aria-label="Etapas da esteira"
+        className="flex shrink-0 items-stretch gap-[30px] overflow-x-auto border-b border-linha bg-superficie px-5"
+      >
+        {ABAS_EXPEDICAO.map((a) => (
+          <Aba
+            key={a.etapa}
+            etapa={a.etapa}
+            rotulo={a.rotulo}
+            contagem={porEtapa.get(a.etapa) ?? 0}
+            ativa={etapaAtiva === a.etapa}
+          />
+        ))}
 
-      <div className="flex flex-1 items-center justify-center bg-superficie px-6 py-20">
-        <div className="max-w-[46ch] text-center">
-          <h1 className="text-[22px] font-bold tracking-[-0.02em]">
-            Nenhuma conta conectada
-          </h1>
-          <p className="mt-3 text-[14px] leading-relaxed text-suave">
-            A esteira fica vazia até a primeira conta do Mercado Livre ser
-            ligada na Integração. Nada aqui é dado de exemplo — o que não
-            existe, não aparece.
-          </p>
-          <a
-            href="/integracao"
-            className="mt-6 inline-block rounded-lg bg-tinta px-4 py-[10px] text-[13px] font-semibold text-white"
-          >
-            Ir para Integração
-          </a>
-        </div>
+        <span className="my-[15px] w-px shrink-0 bg-linha" />
+
+        <Aba
+          etapa="retido"
+          rotulo="Retidos"
+          contagem={porEtapa.get("retido") ?? 0}
+          ativa={etapaAtiva === "retido"}
+          foraDaEsteira
+        />
+
+        <span className="flex-1" />
+      </nav>
+
+      <div className="flex shrink-0 items-center gap-2 border-b border-linha bg-fundo px-5 py-[11px] text-[12.5px] text-suave">
+        <Explicacao etapa={etapaAtiva} />
+        <span className="flex-1" />
+        <span>
+          <b className="font-semibold text-tinta">{pacotes?.length ?? 0}</b>{" "}
+          {pacotes?.length === 1 ? "pacote" : "pacotes"}
+        </span>
+      </div>
+
+      <div className="flex-1 bg-superficie">
+        {error ? (
+          <Vazio
+            titulo="Não foi possível ler a esteira"
+            texto={error.message}
+            critico
+          />
+        ) : !pacotes || pacotes.length === 0 ? (
+          <Vazio {...vazioDaEtapa(etapaAtiva)} />
+        ) : (
+          <ListaPacotes
+            pacotes={pacotes as unknown as LinhaPacote[]}
+            etapa={etapaAtiva}
+          />
+        )}
       </div>
     </Casca>
+  );
+}
+
+function Aba({
+  etapa,
+  rotulo,
+  contagem,
+  ativa,
+  foraDaEsteira,
+}: {
+  etapa: Etapa;
+  rotulo: string;
+  contagem: number;
+  ativa: boolean;
+  foraDaEsteira?: boolean;
+}) {
+  const alerta =
+    (etapa === "aberto" || etapa === "retido") && contagem > 0
+      ? etapa === "aberto"
+        ? "text-critico"
+        : "text-atencao"
+      : etapa === "faturado" && contagem > 0
+        ? "text-atencao"
+        : ativa
+          ? "text-tinta"
+          : "text-[#43464D]";
+
+  return (
+    <Link
+      href={`/expedicao?etapa=${etapa}`}
+      aria-current={ativa ? "page" : undefined}
+      className={`flex shrink-0 flex-col gap-[2px] border-b-[3px] py-[13px] pb-[14px] no-underline ${
+        ativa ? "border-tinta text-tinta" : "border-transparent text-suave"
+      }`}
+    >
+      <span className="flex items-center gap-[6px] text-[10.5px] font-semibold uppercase tracking-[0.13em]">
+        {foraDaEsteira && (
+          <span className="h-[6px] w-[6px] rounded-full bg-atencao" />
+        )}
+        {rotulo}
+      </span>
+      <span
+        className={`text-[25px] font-bold leading-none tracking-[-0.02em] tabular-nums ${alerta}`}
+      >
+        {contagem}
+      </span>
+    </Link>
+  );
+}
+
+function Explicacao({ etapa }: { etapa: Etapa }) {
+  const texto: Partial<Record<Etapa, string>> = {
+    aberto:
+      "Só faturamento e SKU — o que a gente resolve no cadastro e reprocessa.",
+    faturado:
+      "Nota autorizada, esperando a etiqueta do canal. Não há o que corrigir aqui.",
+    separar: "Nota e etiqueta prontas. É daqui que saem as listas.",
+    conferir: "Separado, esperando a bipagem na bancada.",
+    pronto: "Conferido e lacrado, esperando a entrega na doca.",
+    retido:
+      "Fora da esteira: cancelamento, endereço trocado, modalidade alterada pelo canal.",
+  };
+  return <span>{texto[etapa]}</span>;
+}
+
+function vazioDaEtapa(etapa: Etapa) {
+  if (etapa === "aberto") {
+    return {
+      titulo: "Nada parado",
+      texto:
+        "Em operação normal esta aba fica vazia. Se encher, o problema é de cadastro ou de configuração — não de volume.",
+    };
+  }
+  if (etapa === "retido") {
+    return {
+      titulo: "Nenhum pedido retido",
+      texto:
+        "Aqui aparece o que não depende de cadastro nosso. Quando resolver, o pedido volta para a etapa de onde saiu.",
+    };
+  }
+  return {
+    titulo: "Nenhuma conta conectada",
+    texto:
+      "A esteira fica vazia até a primeira conta do Mercado Livre ser ligada na Integração. Nada aqui é dado de exemplo.",
+  };
+}
+
+function Vazio({
+  titulo,
+  texto,
+  critico,
+}: {
+  titulo: string;
+  texto: string;
+  critico?: boolean;
+}) {
+  return (
+    <div className="flex h-full items-center justify-center px-6 py-20">
+      <div className="max-w-[52ch] text-center">
+        <h2
+          className={`text-[20px] font-bold tracking-[-0.02em] ${critico ? "text-critico" : ""}`}
+        >
+          {titulo}
+        </h2>
+        <p className="mt-3 text-[14px] leading-relaxed text-suave">{texto}</p>
+      </div>
+    </div>
   );
 }
