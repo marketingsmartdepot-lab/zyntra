@@ -1,4 +1,5 @@
 import type { BloqueioTipo, Etapa, LinhaPacote } from "@/lib/supabase/tipos";
+import Link from "next/link";
 import { gerarLista } from "./listas/acoes";
 
 const ROTULO_BLOQUEIO: Record<BloqueioTipo, string> = {
@@ -46,7 +47,7 @@ export function ListaPacotes({
             const ehPack = pedidos.length > 1;
 
             return (
-              <tr key={p.id}>
+              <tr key={p.id} className="hover:bg-fundo">
                 {selecionavel && (
                   <Celula>
                     <input
@@ -59,9 +60,12 @@ export function ListaPacotes({
                   </Celula>
                 )}
                 <Celula>
-                  <div className="font-mono text-[12.5px] font-medium tracking-[-0.02em]">
+                  <Link
+                    href={`/expedicao?etapa=${etapa}&pacote=${p.id}`}
+                    className="block font-mono text-[12.5px] font-medium tracking-[-0.02em] text-tinta underline decoration-linha underline-offset-[3px] hover:decoration-tinta"
+                  >
                     {pedidos[0]?.ref_externa ?? envio?.ref_externa ?? "—"}
-                  </div>
+                  </Link>
                   <div className="mt-[2px] text-[11.5px] text-suave">
                     {ehPack
                       ? `pack · ${pedidos.length} pedidos · 1 etiqueta`

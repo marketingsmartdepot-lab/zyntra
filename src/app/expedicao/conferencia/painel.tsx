@@ -1,91 +1,98 @@
 import Link from "next/link";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import type { Etapa } from "@/lib/supabase/tipos";
 import { Bancada, type ItemConferido } from "./bancada";
 import { iniciarConferencia } from "./acoes";
 
 type PacoteNaFila = {
   id: string;
+  etapa: Etapa;
+  etapa_desde: string;
   unidades_esperadas: number | null;
   envios: {
     ref_externa: string;
     limite_envio_em: string | null;
+    etiqueta_obtida_em: string | null;
     modalidades: { nome: string } | null;
-    pedidos: { ref_externa: string }[];
+    pedidos: { ref_externa: string; pack_ref: string | null }[];
   } | null;
   contas: { apelido: string; empresas: { nome_curto: string } | null } | null;
 };
 
-export async function PainelConferencia({
+/**
+ * O painel só aparece quando alguém clica num pedido. Sem seleção, a aba
+ * ocupa a tela inteira — metade de tela vazia esperando clique não ajuda
+ * ninguém.
+ */
+export async function PainelDetalhe({
   fila,
   pacoteId,
+  etapa,
 }: {
   fila: PacoteNaFila[];
-  pacoteId?: string;
+  pacoteId: string;
+  etapa: Etapa;
 }) {
-  const selecionado = pacoteId
-    ? (fila.find((p) => p.id === pacoteId) ?? null)
-    : (fila[0] ?? null);
+  const selecionado = fila.find((p) => p.id === pacoteId) ?? null;
 
   return (
     <div className="flex flex-1">
-      <aside className="flex w-[380px] shrink-0 flex-col border-r border-linha">
-        <div className="flex items-center gap-2 border-b border-linha bg-fundo px-4 py-[11px] text-[12.5px] text-suave">
+      <aside className="flex w-[330px] shrink-0 flex-col border-r border-linha">
+        <div className="flex items-center gap-2 border-b border-linha bg-fundo px-4 py-[10px] text-[12px] text-suave">
           <b className="font-semibold text-tinta">{fila.length}</b>
-          {fila.length === 1 ? " pacote na fila" : " pacotes na fila"}
+          {fila.length === 1 ? " pacote" : " pacotes"}
+          <span className="flex-1" />
+          <Link
+            href={`/expedicao?etapa=${etapa}`}
+            className="text-[12px] font-semibold text-tinta no-underline"
+          >
+            Ver lista inteira
+          </Link>
         </div>
 
-        {fila.length === 0 ? (
-          <p className="px-4 py-6 text-[13px] text-suave">
-            Nada esperando a bancada. Os pacotes chegam aqui quando a lista de
-            separação é concluída.
-          </p>
-        ) : (
-          <ul className="m-0 list-none p-0">
-            {fila.map((p) => {
-              const ativo = selecionado?.id === p.id;
-              const pedidos = p.envios?.pedidos ?? [];
-              return (
-                <li key={p.id}>
-                  <Link
-                    href={`/expedicao?etapa=conferir&pacote=${p.id}`}
-                    aria-current={ativo ? "true" : undefined}
-                    className={`flex items-center gap-3 border-b border-linha-suave px-4 py-[10px] no-underline ${
-                      ativo ? "bg-[#F4F1E8] shadow-[inset_3px_0_0_var(--color-tinta)]" : ""
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-mono text-[12px] font-semibold tracking-[-0.02em]">
-                        {pedidos[0]?.ref_externa ??
-                          p.envios?.ref_externa ??
-                          "sem código"}
-                      </span>
-                      <span className="mt-[1px] block truncate text-[11px] text-suave">
-                        {p.contas?.apelido ?? "—"}
-                        {pedidos.length > 1 && ` · pack ${pedidos.length}`}
-                        {p.envios?.modalidades &&
-                          ` · ${p.envios.modalidades.nome}`}
-                      </span>
+        <ul className="m-0 list-none overflow-y-auto p-0">
+          {fila.map((p) => {
+            const ativo = p.id === pacoteId;
+            const pedidos = p.envios?.pedidos ?? [];
+            return (
+              <li key={p.id}>
+                <Link
+                  href={`/expedicao?etapa=${etapa}&pacote=${p.id}`}
+                  aria-current={ativo ? "true" : undefined}
+                  className={`flex items-center gap-3 border-b border-linha-suave px-4 py-[10px] no-underline ${
+                    ativo
+                      ? "bg-[#F4F1E8] shadow-[inset_3px_0_0_var(--color-tinta)]"
+                      : ""
+                  }`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-mono text-[12px] font-semibold tracking-[-0.02em]">
+                      {pedidos[0]?.ref_externa ??
+                        p.envios?.ref_externa ??
+                        "sem código"}
                     </span>
-                    <span className="shrink-0 font-mono text-[12.5px] font-semibold text-suave">
-                      {p.unidades_esperadas ?? "—"}
+                    <span className="mt-[1px] block truncate text-[11px] text-suave">
+                      {p.contas?.apelido ?? "—"}
+                      {pedidos.length > 1 && ` · pack ${pedidos.length}`}
                     </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                  </span>
+                  <span className="shrink-0 font-mono text-[12.5px] font-semibold text-suave">
+                    {p.unidades_esperadas ?? "—"}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
         {selecionado ? (
-          <Aberto pacote={selecionado} fila={fila} />
+          <Detalhe pacote={selecionado} fila={fila} etapa={etapa} />
         ) : (
           <div className="flex flex-1 items-center justify-center px-6 py-20">
-            <p className="max-w-[46ch] text-center text-[14px] leading-relaxed text-suave">
-              Escolha um pacote na fila para abrir a bancada. Nada é conferido
-              sem que alguém abra a passagem — é ela que congela o que tem que
-              estar na caixa.
+            <p className="max-w-[44ch] text-center text-[14px] leading-relaxed text-suave">
+              Este pacote não está mais nesta etapa. Volte para a lista.
             </p>
           </div>
         )}
@@ -94,24 +101,34 @@ export async function PainelConferencia({
   );
 }
 
-async function Aberto({
+async function Detalhe({
   pacote,
   fila,
+  etapa,
 }: {
   pacote: PacoteNaFila;
   fila: PacoteNaFila[];
+  etapa: Etapa;
 }) {
   const supabase = await criarClienteServidor();
+  const pedidos = pacote.envios?.pedidos ?? [];
 
-  const { data: conferencias } = await supabase
-    .from("conferencias")
-    .select("id")
-    .eq("pacote_id", pacote.id)
-    .eq("situacao", "em_andamento")
-    .limit(1);
+  const [{ data: conferencias }, { data: eventos }] = await Promise.all([
+    supabase
+      .from("conferencias")
+      .select("id")
+      .eq("pacote_id", pacote.id)
+      .eq("situacao", "em_andamento")
+      .limit(1),
+    supabase
+      .from("eventos_pacote")
+      .select("tipo, de, para, detalhe, em")
+      .eq("pacote_id", pacote.id)
+      .order("em", { ascending: false })
+      .limit(12),
+  ]);
 
   const conferencia = conferencias?.[0];
-  const pedidos = pacote.envios?.pedidos ?? [];
   const proximo = fila.find((p) => p.id !== pacote.id)?.id ?? null;
 
   let itens: ItemConferido[] = [];
@@ -135,18 +152,20 @@ async function Aberto({
 
   return (
     <>
-      <header className="flex flex-wrap items-center gap-3 px-6 pb-0 pt-5">
+      <header className="flex flex-wrap items-center gap-3 px-6 pt-5">
         <h1 className="m-0 text-[21px] font-bold tracking-[-0.025em]">
-          Conferência{" "}
           <span className="font-mono font-semibold">
             {pedidos[0]?.ref_externa ?? pacote.envios?.ref_externa}
           </span>
         </h1>
         {pedidos.length > 1 && (
           <span className="rounded-full border border-linha px-[9px] py-[3px] text-[11.5px] font-semibold text-suave">
-            pack · {pedidos.length} pedidos
+            pack · {pedidos.length} pedidos · 1 etiqueta
           </span>
         )}
+        <span className="rounded-full border border-linha px-[9px] py-[3px] text-[11.5px] font-semibold text-suave">
+          {rotuloEtapa(pacote.etapa)}
+        </span>
       </header>
 
       <dl className="grid grid-cols-[auto_1fr_auto_1fr] items-baseline gap-x-[14px] gap-y-[7px] px-6 py-4 text-[13px]">
@@ -170,20 +189,40 @@ async function Aberto({
               })
             : "sem prazo do canal"}
         </dd>
+        <dt className="font-medium text-suave">Etiqueta</dt>
+        <dd className="m-0 font-semibold">
+          {pacote.envios?.etiqueta_obtida_em ? "obtida do canal" : "pendente"}
+        </dd>
+        <dt className="font-medium text-suave">Unidades</dt>
+        <dd className="m-0 font-semibold">
+          {pacote.unidades_esperadas ?? "—"}
+        </dd>
       </dl>
 
-      {conferencia ? (
-        <Bancada
-          conferenciaId={conferencia.id}
-          itensIniciais={itens}
-          proximoPacote={proximo}
-        />
+      {etapa === "conferir" ? (
+        conferencia ? (
+          <Bancada
+            conferenciaId={conferencia.id}
+            itensIniciais={itens}
+            proximoPacote={proximo}
+          />
+        ) : (
+          <IniciarBancada pacoteId={pacote.id} />
+        )
       ) : (
-        <IniciarBancada pacoteId={pacote.id} />
+        <Historico eventos={(eventos ?? []) as Evento[]} />
       )}
     </>
   );
 }
+
+type Evento = {
+  tipo: string;
+  de: string | null;
+  para: string | null;
+  detalhe: string | null;
+  em: string;
+};
 
 type RawItem = {
   sku_id: string;
@@ -191,6 +230,56 @@ type RawItem = {
   quantidade_lida: number;
   skus: { codigo: string; descricao: string } | null;
 };
+
+function Historico({ eventos }: { eventos: Evento[] }) {
+  return (
+    <section className="border-t border-linha px-6 py-4">
+      <h2 className="m-0 mb-3 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave">
+        Histórico
+      </h2>
+      {eventos.length === 0 ? (
+        <p className="text-[13px] text-suave">
+          Nenhum evento ainda. Cada mudança de etapa, leitura e impressão vira
+          uma linha aqui.
+        </p>
+      ) : (
+        <ol className="m-0 list-none p-0">
+          {eventos.map((e, i) => (
+            <li
+              key={i}
+              className="flex gap-3 border-b border-linha-suave py-[9px] last:border-b-0"
+            >
+              <span className="w-[112px] shrink-0 font-mono text-[11.5px] text-suave">
+                {new Date(e.em).toLocaleString("pt-BR", {
+                  dateStyle: "short",
+                  timeStyle: "short",
+                  timeZone: "America/Sao_Paulo",
+                })}
+              </span>
+              <span className="text-[13px]">
+                {e.tipo === "etapa" ? (
+                  <>
+                    <b className="font-semibold">{rotuloEtapa(e.para ?? "")}</b>
+                    {e.de && (
+                      <span className="text-suave"> · veio de {rotuloEtapa(e.de)}</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <b className="font-semibold">{e.tipo}</b>
+                    {e.detalhe && (
+                      <span className="text-suave"> · {e.detalhe}</span>
+                    )}
+                  </>
+                )}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
 
 function IniciarBancada({ pacoteId }: { pacoteId: string }) {
   async function abrir() {
@@ -215,4 +304,17 @@ function IniciarBancada({ pacoteId }: { pacoteId: string }) {
       </form>
     </div>
   );
+}
+
+function rotuloEtapa(e: string) {
+  const mapa: Record<string, string> = {
+    aberto: "Aberto",
+    faturado: "Faturado",
+    separar: "Separar",
+    conferir: "Conferir",
+    pronto: "Pronto pra envio",
+    retido: "Retido",
+    encerrado: "Encerrado",
+  };
+  return mapa[e] ?? e;
 }

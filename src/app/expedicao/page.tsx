@@ -10,7 +10,7 @@ import {
   type Vista,
 } from "@/lib/supabase/tipos";
 import { ListaPacotes } from "./lista";
-import { PainelConferencia } from "./conferencia/painel";
+import { PainelDetalhe } from "./conferencia/painel";
 import { PainelListas } from "./listas/painel";
 
 export const metadata = { title: "Expedição — ZYNTRA" };
@@ -67,7 +67,7 @@ export default async function PaginaExpedicao({
     <Casca
       frente="expedicao"
       email={user.email ?? "sem e-mail"}
-      compacta={vista === "conferir"}
+      compacta={vista === "conferir" && Boolean(pacote)}
     >
       <nav
         aria-label="Etapas da esteira"
@@ -124,10 +124,11 @@ export default async function PaginaExpedicao({
       <div className="flex flex-1 flex-col bg-superficie">
         {vista === "listas" ? (
           <PainelListas listaId={lista} />
-        ) : vista === "conferir" ? (
-          <PainelConferencia
+        ) : pacote ? (
+          <PainelDetalhe
             fila={(pacotes ?? []) as never[]}
             pacoteId={pacote}
+            etapa={etapaAtiva}
           />
         ) : error ? (
           <Vazio
