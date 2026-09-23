@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  /* ---- marca ---- */
+  --color-grafite: #11191c;
+  --color-grafite-2: #162125;
+  --color-grafite-3: #101a1d;
+  --color-grafite-linha: #243036;
+  --color-grafite-linha-2: #3a4a50;
+  --color-champanhe: #d7bf96;
+  --color-champanhe-claro: #f1e3c9;
+  --color-offwhite: #f5f3ee;
+  --color-cinza: #acb3b0;
+  --color-cinza-2: #98a19e;
+
+  /* ---- superfícies claras: as telas de operação ---- */
+  --color-fundo: #edebe4;
+  --color-superficie: #ffffff;
+  --color-tinta: #16181c;
+  --color-suave: #5d6067;
+  --color-linha: #d8d5cc;
+  --color-linha-suave: #e7e4dc;
+
+  /* ---- estado: cor aqui significa situação, nunca decoração ---- */
+  --color-critico: #a32b1f;
+  --color-critico-bg: #f8e7e4;
+  --color-critico-linha: #ebc7c0;
+  --color-atencao: #7e5206;
+  --color-atencao-bg: #f7eeda;
+  --color-atencao-linha: #e6d5ae;
+  --color-ok: #1c6440;
+  --color-ok-bg: #e3f0e7;
+  --color-ok-linha: #c2decc;
+
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+/*
+  Regra de cor do ZYNTRA: champanhe só aparece sobre grafite — logo, seletor de
+  frente ativo, botão da tela de entrada. Nas telas claras o cromo fica neutro e
+  a cor fica reservada para estado (crítico, atenção, ok), senão o operador
+  perde a leitura de relance.
+*/
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-fundo);
+  color: var(--color-tinta);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-champanhe);
+  color: var(--color-grafite);
+}
