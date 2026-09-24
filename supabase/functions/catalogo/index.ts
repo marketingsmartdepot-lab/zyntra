@@ -74,6 +74,7 @@ Deno.serve(async (req) => {
     ja_estavam: 0,
     mudaram: 0,
     sem_codigo: 0,
+    fotos: 0,
     repetidos: [] as string[],
   };
 
@@ -110,7 +111,7 @@ Deno.serve(async (req) => {
     }
 
     const json = (await resposta.json().catch(() => null)) as {
-      data?: { id?: unknown; codigo?: unknown }[];
+      data?: { id?: unknown; codigo?: unknown; imagemURL?: unknown }[];
     } | null;
 
     const produtos = Array.isArray(json?.data) ? json.data : [];
@@ -120,6 +121,9 @@ Deno.serve(async (req) => {
       p_produtos: produtos.map((p) => ({
         id: String(p?.id ?? ""),
         codigo: String(p?.codigo ?? ""),
+        // Opcional: se a listagem do Bling não trouxer imagem, o campo some e
+        // nada quebra — a foto só entra onde não há nenhuma.
+        foto: typeof p?.imagemURL === "string" ? p.imagemURL : "",
       })),
     });
 
@@ -133,6 +137,7 @@ Deno.serve(async (req) => {
       mudaram: number;
       codigos_repetidos: string[] | null;
       sem_codigo: number;
+      fotos: number;
     };
 
     total.paginas += 1;
@@ -141,6 +146,7 @@ Deno.serve(async (req) => {
     total.ja_estavam += c?.ja_estavam ?? 0;
     total.mudaram += c?.mudaram ?? 0;
     total.sem_codigo += c?.sem_codigo ?? 0;
+    total.fotos += c?.fotos ?? 0;
     for (const r of c?.codigos_repetidos ?? []) {
       if (!total.repetidos.includes(r)) total.repetidos.push(r);
     }

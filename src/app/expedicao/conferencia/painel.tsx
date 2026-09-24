@@ -5,6 +5,7 @@ import { Bancada, type ItemConferido } from "./bancada";
 import { iniciarConferencia } from "./acoes";
 import { turnoDaMaquina } from "@/lib/estacao";
 import type { DivergenciaAberta, Lider } from "./divergencia";
+import { ItensDoPedido } from "./itens";
 import {
   PainelEtiqueta,
   type ImpressaoDaEtiqueta,
@@ -260,6 +261,8 @@ async function Detalhe({
           {pacote.unidades_esperadas ?? "—"}
         </dd>
       </dl>
+
+      <ItensDoPedido pacoteId={pacote.id} />
 
       {etapa === "pronto" && (
         <PainelEtiqueta
