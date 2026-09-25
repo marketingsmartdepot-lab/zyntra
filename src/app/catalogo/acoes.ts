@@ -160,3 +160,42 @@ export async function buscarEans() {
     `/catalogo?resultado=eans&eans=${r?.encontrados ?? 0}-${r?.verificados ?? 0}`,
   );
 }
+
+/**
+ * Devolve produtos à importação.
+ *
+ * Não recria o SKU na hora: só tira o código da lista de ignorados. Quem traz
+ * de volta é a sincronização seguinte, com os dados atuais do Bling — recriar
+ * aqui a partir do que foi anotado no dia da exclusão ressuscitaria um produto
+ * com nome e foto possivelmente velhos.
+ */
+export async function restaurarIgnorados(formData: FormData) {
+  const codigos = formData.getAll("codigo").map(String).filter(Boolean);
+
+  revalidatePath("/catalogo");
+
+  if (codigos.length === 0) {
+    redirect("/catalogo?filtro=ignorados&resultado=nada_selecionado");
+  }
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc("voltar_a_importar", {
+    p_codigos: codigos,
+  });
+
+  if (error) redirect("/catalogo?filtro=ignorados&resultado=erro");
+
+  const r = (Array.isArray(data) ? data[0] : data) as {
+    ok: boolean;
+    motivo: string;
+    quantos: number;
+  } | null;
+
+  if (!r?.ok) {
+    redirect(`/catalogo?filtro=ignorados&resultado=${r?.motivo ?? "erro"}`);
+  }
+
+  redirect(
+    `/catalogo?filtro=ignorados&resultado=restaurados&restaurados=${r.quantos}`,
+  );
+}
