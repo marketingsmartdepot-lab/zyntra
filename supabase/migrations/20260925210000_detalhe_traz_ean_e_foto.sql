@@ -47,7 +47,7 @@ begin
       )
       -- Produto que o Bling não tem é reperguntado só uma vez por semana: sem
       -- isso, a rotina passaria a vida batendo nos mesmos.
-      and (s.ean_verificado_em is null or s.ean_verificado_em < now() - interval '7 days')
+      and (s.ean_verificado_em is null or s.ean_verificado_em < now() - interval '1 day')
     order by s.ean_verificado_em nulls first, s.codigo
     limit greatest(least(coalesce(p_limite, 60), 200), 1)
   loop
