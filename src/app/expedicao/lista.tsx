@@ -155,9 +155,11 @@ export function ListaPacotes({
     <form action={gerarLista} className="flex flex-1 flex-col">
       {tabela}
       <div className="mt-auto flex items-center gap-3 border-t border-linha bg-fundo px-5 py-3">
-        <span className="text-[12.5px] text-suave">
-          Marque os pacotes e gere a lista. Ela pode cruzar contas e empresas —
-          quem anda pelo corredor não quer uma lista por CNPJ.
+        <span className="max-w-[72ch] text-[12.5px] text-suave">
+          Marque os pedidos e gere a lista: a folha sai na impressora desta
+          bancada e os pedidos passam para <b>Conferir</b> no mesmo ato. A
+          lista pode cruzar contas e empresas — quem anda pelo corredor não
+          quer uma lista por CNPJ.
         </span>
         <span className="flex-1" />
         <button

@@ -75,10 +75,15 @@ export default async function PaginaExpedicao({
     porEtapa.set(linha.etapa, (porEtapa.get(linha.etapa) ?? 0) + 1);
   }
 
-  const { count: listasAbertas } = await supabase
+  // Lista não tem mais "aberta": ela nasce emitida e os pedidos já andaram.
+  // O número que interessa na aba é quantas saíram hoje.
+  const inicioDoDia = new Date();
+  inicioDoDia.setHours(0, 0, 0, 0);
+
+  const { count: listasDoDia } = await supabase
     .from("listas_separacao")
     .select("id", { count: "exact", head: true })
-    .in("situacao", ["aguardando", "em_execucao"]);
+    .gte("criada_em", inicioDoDia.toISOString());
 
   const { data: pacotes, error } = await supabase
     .from("pacotes")
@@ -115,12 +120,11 @@ export default async function PaginaExpedicao({
             chave: "listas",
             href: "/expedicao?etapa=listas",
             rotulo: "Lista de separação",
-            contagem: listasAbertas ?? 0,
+            contagem: listasDoDia ?? 0,
             ativa: vista === "listas",
             // Fora da esteira: a esteira é ABERTO > FATURADO > SEPARAR >
-            // CONFERIR > PRONTO, e só. Um pacote nunca está "em listas" — ele
-            // está em Separar e por acaso pertence a uma lista. Deixá-la no
-            // meio da sequência fazia a esteira parecer ter seis etapas.
+            // CONFERIR > PRONTO, e só. A lista não é uma etapa — é o registro
+            // do papel que saiu, guardado para quando uma caixa some.
             separadaAntes: true,
           },
           {
@@ -207,12 +211,13 @@ export default async function PaginaExpedicao({
 function Explicacao({ vista }: { vista: Vista }) {
   const texto: Partial<Record<Vista, string>> = {
     listas:
-      "A lista do corredor, consolidada por SKU. Pode cruzar contas e empresas.",
+      "Registro das listas emitidas: quais pedidos entraram e quem separou.",
     aberto:
       "Só faturamento e SKU — o que a gente resolve no cadastro e reprocessa.",
     faturado:
       "Nota autorizada, esperando a etiqueta do canal. Não há o que corrigir aqui.",
-    separar: "Nota e etiqueta prontas. É daqui que saem as listas.",
+    separar:
+      "Nota e etiqueta prontas. Gerar a lista imprime o papel e manda os pedidos para Conferir.",
     conferir: "Separado, esperando a bipagem na bancada.",
     pronto: "Conferido e lacrado, esperando a entrega na doca.",
     retido:

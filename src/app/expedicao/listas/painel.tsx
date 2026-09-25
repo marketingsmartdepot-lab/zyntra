@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { concluirLista, imprimirLista, iniciarLista } from "./acoes";
+import { imprimirLista } from "./acoes";
 
 type Resumo = {
   id: string;
@@ -8,9 +8,19 @@ type Resumo = {
   situacao: string;
   criada_em: string;
   separador: string | null;
+  gerada_por: string | null;
   pacotes: number;
   unidades: number;
   contas: number;
+};
+
+type Pedido = {
+  pacote_id: string;
+  codigo: string;
+  etapa: string;
+  unidades: number | null;
+  conta: string;
+  canal: string;
 };
 
 type Item = {
@@ -38,15 +48,18 @@ export async function PainelListas({
     .limit(60);
 
   const listas = (data ?? []) as Resumo[];
-  const abertas = listas.filter((l) =>
-    ["aguardando", "em_execucao"].includes(l.situacao),
-  );
-  const encerradas = listas.filter(
-    (l) => !["aguardando", "em_execucao"].includes(l.situacao),
+
+  // A lista não tem mais início e fim: ela nasce emitida, o papel sai e os
+  // pedidos já foram para Conferir. O que separa uma da outra é a data —
+  // quem abre esta aba está procurando "a lista de hoje de manhã".
+  const hoje = new Date().toDateString();
+  const doDia = listas.filter((l) => new Date(l.criada_em).toDateString() === hoje);
+  const anteriores = listas.filter(
+    (l) => new Date(l.criada_em).toDateString() !== hoje,
   );
 
   const aberta =
-    (listaId && listas.find((l) => l.id === listaId)) || abertas[0] || null;
+    (listaId && listas.find((l) => l.id === listaId)) || listas[0] || null;
 
   if (listas.length === 0) {
     return (
@@ -57,8 +70,9 @@ export async function PainelListas({
           </h2>
           <p className="mt-3 text-[14px] leading-relaxed text-suave">
             As listas nascem na aba Separar: você marca os pacotes e gera a
-            lista. Ela pode cruzar contas e empresas — quem anda pelo corredor
-            não quer uma lista por CNPJ.
+            lista. O papel sai na impressora e os pedidos vão direto para
+            Conferir. Esta aba guarda o registro de cada uma — quais pedidos
+            entraram e quem gerou.
           </p>
         </div>
       </div>
@@ -68,11 +82,11 @@ export async function PainelListas({
   return (
     <div className="flex flex-1">
       <aside className="w-[250px] shrink-0 border-r border-linha bg-fundo p-[14px]">
-        <Grupo titulo="Ativas" listas={abertas} ativa={aberta?.id} />
-        {encerradas.length > 0 && (
+        <Grupo titulo="Hoje" listas={doDia} ativa={aberta?.id} />
+        {anteriores.length > 0 && (
           <Grupo
-            titulo="Encerradas"
-            listas={encerradas.slice(0, 10)}
+            titulo="Anteriores"
+            listas={anteriores.slice(0, 20)}
             ativa={aberta?.id}
             apagada
           />
@@ -148,7 +162,6 @@ async function ListaAberta({
     .order("codigo");
 
   const itens = (data ?? []) as Item[];
-  const emAberto = ["aguardando", "em_execucao"].includes(lista.situacao);
 
   return (
     <>
@@ -158,10 +171,18 @@ async function ListaAberta({
             Lista {lista.codigo}
           </h2>
           <p className="mt-[2px] text-[12.5px] text-suave">
-            {rotuloSituacao(lista.situacao)} · {lista.pacotes}{" "}
-            {lista.pacotes === 1 ? "pacote" : "pacotes"} · {lista.contas}{" "}
-            {lista.contas === 1 ? "conta" : "contas"}
-            {lista.separador && ` · separador ${lista.separador}`}
+            {rotuloSituacao(lista.situacao)} {quando(lista.criada_em)} ·{" "}
+            {lista.pacotes} {lista.pacotes === 1 ? "pedido" : "pedidos"} ·{" "}
+            {lista.contas} {lista.contas === 1 ? "conta" : "contas"}
+          </p>
+          <p className="mt-[2px] text-[12.5px] text-suave">
+            {/* O registro: quem estava no turno quando o papel saiu, e quem
+                clicou. Nem sempre são a mesma pessoa. */}
+            Separador:{" "}
+            <b className="font-semibold text-tinta">
+              {lista.separador ?? "sem turno aberto na bancada"}
+            </b>
+            {lista.gerada_por && ` · gerada por ${lista.gerada_por}`}
           </p>
         </div>
 
@@ -174,39 +195,17 @@ async function ListaAberta({
           <div className="text-[12.5px] text-suave">unidades na lista</div>
         </div>
 
-        {emAberto && (
-          <>
-            {lista.situacao === "aguardando" && (
-              <form action={iniciarLista}>
-                <input type="hidden" name="lista" value={lista.id} />
-                <button
-                  type="submit"
-                  className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
-                >
-                  Iniciar separação
-                </button>
-              </form>
-            )}
-            <form action={imprimirLista}>
-              <input type="hidden" name="lista" value={lista.id} />
-              <button
-                type="submit"
-                className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
-              >
-                Imprimir folha
-              </button>
-            </form>
-            <form action={concluirLista}>
-              <input type="hidden" name="lista" value={lista.id} />
-              <button
-                type="submit"
-                className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
-              >
-                Concluir e mandar para Conferir
-              </button>
-            </form>
-          </>
-        )}
+        {/* A única ação que sobrou. Não há "concluir": os pedidos já foram
+            para Conferir no momento em que a lista foi gerada. */}
+        <form action={imprimirLista}>
+          <input type="hidden" name="lista" value={lista.id} />
+          <button
+            type="submit"
+            className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
+          >
+            Reimprimir folha
+          </button>
+        </form>
       </header>
 
       {impressao && <AvisoImpressao resultado={impressao} />}
@@ -269,23 +268,111 @@ async function ListaAberta({
         </div>
       )}
 
+      <PedidosDaLista listaId={lista.id} />
+
       <p className="mt-auto border-t border-linha bg-fundo px-5 py-4 text-[12.5px] text-suave">
         Sem endereço de prateleira nesta versão — o estoque fica na Lexos, então
-        o sistema não conhece a localização. <b>Concluir a lista não substitui
-        a conferência</b>: cada pacote ainda passa pela bancada um a um.
+        o sistema não conhece a localização. <b>Esta lista não substitui a
+        conferência</b>: cada pedido ainda passa pela bancada um a um.
       </p>
     </>
   );
 }
 
+/**
+ * Os pedidos que entraram nesta lista, e onde cada um está hoje.
+ *
+ * É este o motivo da aba existir. Quando uma caixa some, vem trocada ou o
+ * cliente reclama, a pergunta é sempre a mesma: quem pegou este pedido e com
+ * qual lista? A resposta está aqui — o papel do corredor some, o registro não.
+ */
+async function PedidosDaLista({ listaId }: { listaId: string }) {
+  const supabase = await criarClienteServidor();
+  const { data } = await supabase
+    .from("listas_pacotes_resumo")
+    .select("*")
+    .eq("lista_id", listaId)
+    .order("codigo");
+
+  const pedidos = (data ?? []) as Pedido[];
+  if (pedidos.length === 0) return null;
+
+  return (
+    <section className="border-t border-linha">
+      <h3 className="m-0 px-5 pb-2 pt-4 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave">
+        Pedidos desta lista
+      </h3>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              {["Pedido", "Conta", "Canal", "Unidades", "Onde está hoje"].map(
+                (c) => (
+                  <th
+                    key={c}
+                    className="border-b border-linha px-4 py-[10px] text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-suave"
+                  >
+                    {c}
+                  </th>
+                ),
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {pedidos.map((p) => (
+              <tr key={p.pacote_id}>
+                <td className="border-b border-linha-suave px-4 py-[10px] font-mono text-[13px] font-semibold">
+                  {p.codigo}
+                </td>
+                <td className="border-b border-linha-suave px-4 py-[10px] text-[13px]">
+                  {p.conta}
+                </td>
+                <td className="border-b border-linha-suave px-4 py-[10px] text-[12.5px] text-suave">
+                  {p.canal}
+                </td>
+                <td className="border-b border-linha-suave px-4 py-[10px] font-mono text-[13px] tabular-nums">
+                  {p.unidades ?? "—"}
+                </td>
+                <td className="border-b border-linha-suave px-4 py-[10px]">
+                  <span className="rounded-md border border-linha bg-fundo px-[9px] py-[3px] text-[12px] font-semibold">
+                    {rotuloEtapa(p.etapa)}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function rotuloEtapa(e: string) {
+  const nomes: Record<string, string> = {
+    aberto: "Aberto",
+    faturado: "Faturado",
+    separar: "Separar",
+    conferir: "Conferir",
+    pronto: "Pronto pra envio",
+    retido: "Retido",
+    encerrado: "Encerrado",
+  };
+  return nomes[e] ?? e;
+}
+
+/** Data e hora curtas, no fuso do galpão. */
+function quando(iso: string) {
+  return new Date(iso).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  });
+}
+
 function rotuloSituacao(s: string) {
-  return s === "aguardando"
-    ? "Aguardando separador"
-    : s === "em_execucao"
-      ? "Em execução"
-      : s === "concluida"
-        ? "Concluída"
-        : "Cancelada";
+  return s === "cancelada" ? "Cancelada" : "Emitida";
 }
 
 /**
@@ -313,6 +400,8 @@ function AvisoImpressao({ resultado }: { resultado: string }) {
     sem_conteudo:
       "A folha saiu vazia, então nada foi enfileirado. Isso acontece quando nenhum item da lista tem SKU mapeado.",
     lista_nao_encontrada: "Esta lista não existe mais.",
+    sem_bancada:
+      "A lista foi gerada e os pedidos já estão em Conferir, mas esta máquina ainda não sabe qual bancada é — por isso o papel não saiu. Escolha a bancada e use Reimprimir folha.",
   };
 
   return (
