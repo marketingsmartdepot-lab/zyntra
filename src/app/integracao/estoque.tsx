@@ -2,16 +2,9 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import { ConexaoBling } from "./bling";
 import {
   salvarDeposito,
-  sincronizarCatalogo,
   tentarBaixaDeNovo,
 } from "./estoque-acoes";
 
-type SemRef = {
-  id: string;
-  codigo: string;
-  descricao: string | null;
-  tem_anuncio: boolean;
-};
 
 type Config = {
   deposito_ref: string | null;
@@ -52,7 +45,7 @@ export async function Estoque({
 }) {
   const supabase = await criarClienteServidor();
 
-  const [{ data: config }, { data: fila }, { data: semRef, count: totalSemRef }] =
+  const [{ data: config }, { data: fila }] =
     await Promise.all([
     supabase
       .from("erp_config")
@@ -66,11 +59,6 @@ export async function Estoque({
       .neq("situacao", "enviada")
       .order("criada_em", { ascending: false })
       .limit(30),
-    supabase
-      .from("skus_sem_erp")
-      .select("id, codigo, descricao, tem_anuncio", { count: "exact" })
-      .order("codigo")
-      .limit(20),
   ]);
 
   // O id do depósito não existe na interface do Bling — só na API. Por isso a
@@ -184,43 +172,8 @@ export async function Estoque({
         </button>
       </form>
 
-      <section>
-        <h3 className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave">
-          Catálogo
-        </h3>
-        <p className="m-0 mb-3 max-w-[70ch] text-[12.5px] leading-relaxed text-suave">
-          Cada SKU precisa saber qual produto ele é no Bling. A sincronização
-          casa pelo código — e código repetido no Bling fica de fora em vez de
-          casar com qualquer um, porque casar errado daria baixa no produto
-          errado para sempre.
-        </p>
-
-        {(totalSemRef ?? 0) > 0 ? (
-          <div className="mb-3 rounded-[9px] border border-atencao-linha bg-atencao-bg px-4 py-3">
-            <p className="m-0 text-[12.5px] font-semibold text-atencao">
-              {totalSemRef} {totalSemRef === 1 ? "SKU ativo" : "SKUs ativos"} sem
-              referência no Bling — cada um é uma baixa que vai falhar.
-            </p>
-            <p className="m-0 mt-2 font-mono text-[11.5px] text-[#7A5A24]">
-              {((semRef ?? []) as SemRef[]).map((s) => s.codigo).join(" · ")}
-              {(totalSemRef ?? 0) > 20 && " …"}
-            </p>
-          </div>
-        ) : (
-          <p className="m-0 mb-3 text-[13px] text-suave">
-            Nenhum SKU ativo sem referência.
-          </p>
-        )}
-
-        <form action={sincronizarCatalogo}>
-          <button
-            type="submit"
-            className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
-          >
-            Sincronizar catálogo com o Bling
-          </button>
-        </form>
-      </section>
+      {/* O catálogo ganhou aba própria: são milhares de linhas, e aqui elas
+          afogavam o que esta aba realmente trata, que é a fila de baixas. */}
 
       <section>
         <h3 className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave">

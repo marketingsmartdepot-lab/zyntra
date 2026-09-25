@@ -10,6 +10,7 @@ import { Operadores } from "./operadores";
 import { Estoque } from "./estoque";
 import { Cadastros } from "./cadastros";
 import { Equipe } from "./equipe";
+import { Catalogo } from "./catalogo";
 
 export const metadata = { title: "Integração — ZYNTRA" };
 
@@ -18,6 +19,7 @@ const ABAS = [
   { chave: "impressoras", rotulo: "Estações e impressoras" },
   { chave: "operadores", rotulo: "Operadores" },
   { chave: "estoque", rotulo: "Estoque" },
+  { chave: "catalogo", rotulo: "Catálogo" },
   { chave: "cadastros", rotulo: "Cadastros" },
   { chave: "equipe", rotulo: "Equipe" },
 ] as const;
@@ -27,7 +29,20 @@ type Aba = (typeof ABAS)[number]["chave"];
 export default async function PaginaIntegracao({
   searchParams,
 }: {
-  searchParams: Promise<{ aba?: string; falha?: string; bling?: string }>;
+  searchParams: Promise<{
+    aba?: string;
+    falha?: string;
+    bling?: string;
+    sincronia?: string;
+    busca?: string;
+    pagina?: string;
+    filtro?: string;
+    lidos?: string;
+    criados?: string;
+    casados?: string;
+    sem_codigo?: string;
+    repetidos?: string;
+  }>;
 }) {
   const supabase = await criarClienteServidor();
   const {
@@ -35,7 +50,11 @@ export default async function PaginaIntegracao({
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar?destino=/integracao");
 
-  const { aba: pedida, falha, bling } = await searchParams;
+  const {
+    aba: pedida, falha, bling, sincronia,
+    busca, pagina, filtro,
+    lidos, criados, casados, sem_codigo, repetidos,
+  } = await searchParams;
 
   // O endereço público de retorno do OAuth sai daqui, não de uma constante:
   // em produção e na máquina local ele é diferente, e cravar um dos dois
@@ -81,6 +100,12 @@ export default async function PaginaIntegracao({
     .select("id", { count: "exact", head: true })
     .eq("ativo", true);
 
+  // SKUs ativos: é a contagem que faz sentido na aba do catálogo.
+  const { count: skusAtivos } = await supabase
+    .from("skus")
+    .select("id", { count: "exact", head: true })
+    .eq("ativo", true);
+
   const { count: empresas } = await supabase
     .from("empresas")
     .select("id", { count: "exact", head: true })
@@ -120,6 +145,13 @@ export default async function PaginaIntegracao({
             ativa: aba === "estoque",
             // Baixa parada na fila é problema, não volume de trabalho.
             tom: "atencao" as const,
+          },
+          {
+            chave: "catalogo",
+            href: "/integracao?aba=catalogo",
+            rotulo: "Catálogo",
+            contagem: skusAtivos ?? 0,
+            ativa: aba === "catalogo",
           },
           {
             chave: "cadastros",
@@ -162,6 +194,8 @@ export default async function PaginaIntegracao({
               "Quem trabalha na bancada não usa e-mail e senha: entra com nome e PIN. São coisas separadas de propósito."}
             {aba === "estoque" &&
               "A baixa acontece quando a NF-e é autorizada, não quando a caixa sai — senão a peça segue vendável por horas."}
+            {aba === "catalogo" &&
+              "O que o galpão vende. Quem cria produto é o Bling; aqui a pergunta é o que já está pronto para a esteira."}
             {aba === "cadastros" &&
               "O que o sistema lê e ninguém tinha onde criar. Muda raramente, então fica tudo junto."}
             {aba === "equipe" &&
@@ -176,6 +210,15 @@ export default async function PaginaIntegracao({
         {aba === "operadores" && <Operadores falha={falha} />}
         {aba === "estoque" && (
           <Estoque falha={falha} bling={bling} origem={origem} />
+        )}
+        {aba === "catalogo" && (
+          <Catalogo
+            busca={busca}
+            pagina={pagina}
+            filtro={filtro}
+            resultado={sincronia}
+            numeros={{ lidos, criados, casados, sem_codigo, repetidos }}
+          />
         )}
         {aba === "cadastros" && <Cadastros falha={falha} />}
         {aba === "equipe" && <Equipe falha={falha} />}
