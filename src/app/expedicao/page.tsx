@@ -11,6 +11,7 @@ import {
 } from "@/lib/supabase/tipos";
 import { Barra } from "@/components/barra";
 import { ListaPacotes } from "./lista";
+import { AbrirCarrinho } from "../logistica/abrir-carrinho";
 import { PainelDetalhe } from "./conferencia/painel";
 import { PainelListas } from "./listas/painel";
 import { AbertoPorCausa } from "./aberto";
@@ -116,6 +117,11 @@ export default async function PaginaExpedicao({
             rotulo: "Lista de separação",
             contagem: listasAbertas ?? 0,
             ativa: vista === "listas",
+            // Fora da esteira: a esteira é ABERTO > FATURADO > SEPARAR >
+            // CONFERIR > PRONTO, e só. Um pacote nunca está "em listas" — ele
+            // está em Separar e por acaso pertence a uma lista. Deixá-la no
+            // meio da sequência fazia a esteira parecer ter seis etapas.
+            separadaAntes: true,
           },
           {
             chave: "retido",
@@ -124,8 +130,8 @@ export default async function PaginaExpedicao({
             contagem: porEtapa.get("retido") ?? 0,
             ativa: vista === "retido",
             tom: "atencao" as const,
-            // Retido está FORA da esteira — por isso separado do grupo.
-            separadaAntes: true,
+            // Também fora da esteira, junto da Lista: são as duas coisas que
+            // não são etapa.
           },
         ]}
         explicacao={
@@ -172,11 +178,24 @@ export default async function PaginaExpedicao({
         ) : !pacotes || pacotes.length === 0 ? (
           <Vazio {...vazioDaEtapa(etapaAtiva)} />
         ) : (
-          <ListaPacotes
-            pacotes={pacotes as unknown as LinhaPacote[]}
-            etapa={etapaAtiva}
-            selecionavel={vista === "separar"}
-          />
+          <div className="flex flex-1 flex-col">
+            <ListaPacotes
+              pacotes={pacotes as unknown as LinhaPacote[]}
+              etapa={etapaAtiva}
+              selecionavel={vista === "separar"}
+            />
+            {/* O fechamento mora aqui: quando a caixa está pronta pra envio, o
+                passo seguinte é levá-la para a doca. Mandar a pessoa trocar de
+                frente para achar o botão é pedir que ela largue a pilha. */}
+            {vista === "pronto" && (
+              <div className="mt-auto border-t border-linha bg-fundo px-5 py-3">
+                <AbrirCarrinho
+                  compacto
+                  aviso="Abre o carrinho e leva para a bancada de bipagem da doca. Caixa sem etiqueta confirmada é recusada lá."
+                />
+              </div>
+            )}
+          </div>
         )}
       </div>
     </Casca>

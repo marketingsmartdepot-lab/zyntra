@@ -1,6 +1,7 @@
 import { moeda, quando } from "./formato";
 import Link from "next/link";
-import { abrirEntregaDoca, abrirSaida } from "./acoes";
+import { abrirSaida } from "./acoes";
+import { AbrirCarrinho } from "./abrir-carrinho";
 
 export type Destino = {
   modalidade_id: string | null;
@@ -21,46 +22,6 @@ export type EntregaResumo = {
   pacotes: number;
   ja_sairam: number;
 };
-
-/**
- * Abrir o carrinho que leva as caixas da expedição para a doca.
- *
- * O nome é pedido uma vez, na abertura: é uma pessoa por carrinho, e é por
- * esse nome que se descobre quem estava com a caixa quando ela some.
- */
-function AbrirCarrinho() {
-  return (
-    <form
-      action={abrirEntregaDoca}
-      className="flex flex-wrap items-end gap-2 rounded-[9px] border border-linha px-4 py-[14px]"
-    >
-      <div>
-        <label
-          htmlFor="doca-quem"
-          className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
-        >
-          Quem está levando para a doca
-        </label>
-        <input
-          id="doca-quem"
-          name="entregue_por"
-          required
-          placeholder="nome de quem empurra o carrinho"
-          className="w-[280px] rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
-        />
-      </div>
-      <button
-        type="submit"
-        className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
-      >
-        Registrar entrega na doca
-      </button>
-      <span className="text-[12.5px] text-suave">
-        Depois é bipar cada caixa. O carrinho pode ser misto.
-      </span>
-    </form>
-  );
-}
 
 function EntregasDoDia({ entregas }: { entregas: EntregaResumo[] }) {
   if (entregas.length === 0) return null;
