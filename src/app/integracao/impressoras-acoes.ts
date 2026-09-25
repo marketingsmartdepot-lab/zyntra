@@ -20,17 +20,22 @@ function encerrar(falha?: string) {
  */
 export async function ajustarImpressora(formData: FormData) {
   const id = String(formData.get("impressora") ?? "");
-  const tipo = String(formData.get("tipo") ?? "comum");
+  const linguagem = String(formData.get("linguagem") ?? "zpl");
+  const ativa = String(formData.get("ativa") ?? "sim") === "sim";
   const estacao = String(formData.get("estacao") ?? "");
   const copias = Number(formData.get("copias") ?? 1);
 
   if (!id) return encerrar("erro");
+  // Valor fora da lista não chega ao banco: lá existe uma restrição, mas
+  // recusar aqui dá uma mensagem em vez de um erro de banco.
+  if (!["zpl", "pdf"].includes(linguagem)) return encerrar("linguagem_invalida");
 
   const supabase = await criarClienteServidor();
   const { error } = await supabase
     .from("impressoras")
     .update({
-      tipo,
+      linguagem,
+      ativa,
       estacao_id: estacao || null,
       copias: Number.isFinite(copias) ? Math.min(Math.max(copias, 1), 10) : 1,
     })

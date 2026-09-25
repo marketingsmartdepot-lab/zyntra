@@ -39,6 +39,27 @@ jobs:
           Write-Host "versão: $saida"
           if (-not $saida) { throw "o executável não respondeu --versao" }
 
+      # 83 MB é o tamanho do Node inteiro, que vai dentro do executável. O
+      # limite de arquivo do plano é 50 MB, e é por isso que ele precisa
+      # encolher — comprimido fica em torno de 28 MB.
+      - name: Comprimir
+        run: |
+          choco install upx --no-progress -y
+          $antes = (Get-Item .\dist\ZyntraAgente.exe).Length
+          upx --best .\dist\ZyntraAgente.exe
+          $depois = (Get-Item .\dist\ZyntraAgente.exe).Length
+          Write-Host ("de {0} MB para {1} MB" -f [int]($antes/1MB), [int]($depois/1MB))
+          if ($depois -ge 50MB) { throw "ainda acima de 50 MB — nao cabe no Storage" }
+
+      # A conferência mais importante do workflow. Comprimir mexe nas seções do
+      # executável, e o código do agente vive numa delas. Se a compressão
+      # quebrar isso, é AQUI que se descobre — não na bancada.
+      - name: Conferir que o executável comprimido ainda abre
+        run: |
+          $saida = & .\dist\ZyntraAgente.exe --versao
+          Write-Host "versão apos comprimir: $saida"
+          if (-not $saida) { throw "a compressao quebrou o executavel" }
+
       - name: Conferir que enxerga as impressoras
         run: |
           # Não é teste de impressão — é conferir que a descoberta funciona

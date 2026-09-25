@@ -22,7 +22,8 @@ type Impressora = {
   dispositivo_id: string | null;
   nome_no_sistema: string | null;
   nome: string;
-  tipo: string;
+  linguagem: string;
+  ativa: boolean;
   copias: number;
   estacao_id: string | null;
   vista_em: string | null;
@@ -48,7 +49,7 @@ export async function Impressoras({ falha }: { falha?: string }) {
     supabase.from("maquinas_do_agente").select("*").order("nome_maquina"),
     supabase
       .from("impressoras")
-      .select("id, dispositivo_id, nome_no_sistema, nome, tipo, copias, estacao_id, vista_em")
+      .select("id, dispositivo_id, nome_no_sistema, nome, linguagem, ativa, copias, estacao_id, vista_em")
       .order("nome_no_sistema"),
     supabase.from("estacoes").select("id, nome").order("nome"),
   ]);
@@ -117,7 +118,7 @@ export async function Impressoras({ falha }: { falha?: string }) {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr>
-                        {["Impressora", "Serve para", "Bancada", "Cópias", ""].map(
+                        {["Impressora", "Imprime", "Bancada", "Cópias", ""].map(
                           (c, i) => (
                             <th
                               key={i}
@@ -143,15 +144,23 @@ export async function Impressoras({ falha }: { falha?: string }) {
                               <input type="hidden" name="impressora" value={i.id} />
 
                               <select
-                                name="tipo"
-                                defaultValue={i.tipo}
-                                aria-label="Serve para"
+                                name="linguagem"
+                                defaultValue={i.linguagem}
+                                aria-label="O que esta impressora imprime"
                                 className="rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
                               >
-                                <option value="comum">Não usar para etiqueta</option>
-                                <option value="termica_zpl">
-                                  Etiqueta térmica (ZPL)
-                                </option>
+                                <option value="zpl">Etiqueta térmica (ZPL)</option>
+                                <option value="pdf">Papel comum (PDF)</option>
+                              </select>
+
+                              <select
+                                name="ativa"
+                                defaultValue={i.ativa ? "sim" : "nao"}
+                                aria-label="Usar esta impressora"
+                                className="rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
+                              >
+                                <option value="sim">Em uso</option>
+                                <option value="nao">Não usar</option>
                               </select>
 
                               <select
@@ -313,6 +322,7 @@ function Aviso({ resultado }: { resultado: string }) {
     sem_permissao: "Só um administrador mexe em máquinas e impressoras.",
     sem_nome: "Dê um nome à bancada.",
     maquina_nao_encontrada: "Essa máquina já não existe mais.",
+    linguagem_invalida: "Escolha ZPL ou PDF.",
     erro: "Não foi possível concluir.",
   };
 

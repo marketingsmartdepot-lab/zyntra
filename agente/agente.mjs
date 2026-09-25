@@ -24,7 +24,14 @@
  */
 
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync, unlinkSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  unlinkSync,
+} from "node:fs";
 import { tmpdir, hostname, platform, homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -72,6 +79,10 @@ async function principal() {
   cfg = (await lerConfig()) ?? (await primeiraVez());
   if (!cfg) return 1;
 
+  await instalarSeNecessario().catch((e) =>
+    registrar(`não consegui deixar o agente instalado: ${e.message}`),
+  );
+
   // A lista de impressoras vai a cada início: impressora nova aparece na tela
   // do ZYNTRA sem ninguém reinstalar nada.
   await publicarImpressoras().catch((e) =>
@@ -102,9 +113,9 @@ async function principal() {
 
       for (const t of trabalhos) {
         try {
-          await imprimir(t.impressora, t.conteudo, t.copias ?? 1);
+          await imprimir(t.impressora, t.conteudo, t.copias ?? 1, t.linguagem);
           await concluir(t.id, true);
-          registrar(`ok   ${t.tipo}  ${t.impressora}`);
+          registrar(`ok   ${t.tipo}  ${t.impressora}  (${t.linguagem ?? "zpl"})`);
         } catch (erro) {
           const msg = erro instanceof Error ? erro.message : String(erro);
           await concluir(t.id, false, msg);
@@ -123,6 +134,67 @@ async function principal() {
 }
 
 // ------------------------------------------------------------ primeira vez
+
+/** O agente está rodando como executável, e não pelo código-fonte? */
+async function empacotado() {
+  try {
+    const sea = await import("node:sea");
+    return sea.isSea();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Deixa o agente instalado, sem instalador.
+ *
+ * Ela baixa o .exe pelo ZYNTRA, abre, entra com e-mail e senha — e acabou. O
+ * próprio agente se copia para a pasta do usuário e se agenda para abrir
+ * quando alguém entrar no Windows. Rodar de novo o arquivo baixado atualiza a
+ * cópia instalada; é assim que uma versão nova chega à bancada.
+ *
+ * Tarefa agendada, e não serviço do Windows: a credencial da máquina mora na
+ * pasta do usuário, e serviço roda como SYSTEM, que tem outra pasta.
+ */
+async function instalarSeNecessario() {
+  if (platform() !== "win32") return;
+  if (!(await empacotado())) return; // rodando pelo código-fonte, não se copia
+
+  const destino = join(process.env.LOCALAPPDATA ?? homedir(), "ZYNTRA");
+  const alvo = join(destino, "ZyntraAgente.exe");
+
+  // Já é a cópia instalada que está rodando — nada a fazer.
+  if (process.execPath.toLowerCase() === alvo.toLowerCase()) return;
+
+  mkdirSync(destino, { recursive: true });
+
+  try {
+    copyFileSync(process.execPath, alvo);
+  } catch (erro) {
+    // O Windows tranca o arquivo de um programa em execução. Se a cópia
+    // instalada já está aberta, ela é a que vale.
+    if (existsSync(alvo)) {
+      registrar("já havia uma cópia instalada em uso — mantida");
+      return;
+    }
+    throw erro;
+  }
+
+  await executar("schtasks", [
+    "/Create",
+    "/TN",
+    "ZYNTRA - Agente de impressao",
+    "/TR",
+    `"${alvo}"`,
+    "/SC",
+    "ONLOGON",
+    "/RL",
+    "LIMITED",
+    "/F",
+  ]);
+
+  registrar(`instalado em ${destino} — abre sozinho ao entrar no Windows`);
+}
 
 async function primeiraVez() {
   // O login é digitado, então precisa de um terminal de verdade. Sem isso o
@@ -283,16 +355,111 @@ async function listarImpressoras() {
  * rede — exigia a impressora compartilhada, um passo a mais que falha calado
  * quando alguém esquece ou quando uma atualização apaga o compartilhamento.
  */
-async function imprimir(impressora, zpl, copias) {
-  if (!zpl || !zpl.trim()) throw new Error("trabalho sem conteúdo");
+/**
+ * ZPL e PDF são dois caminhos completamente diferentes.
+ *
+ * ZPL é linguagem da própria impressora: vai crua para o spooler, sem driver
+ * no meio. PDF é um documento — precisa de alguém que saiba desenhá-lo na
+ * folha. Mandar PDF cru para a impressora imprime páginas de lixo.
+ */
+async function imprimir(impressora, conteudo, copias, linguagem) {
+  if (!conteudo || !conteudo.trim()) throw new Error("trabalho sem conteúdo");
   if (!impressora) throw new Error("trabalho sem impressora definida");
 
+  const lingua = linguagem ?? "zpl";
+
   for (let i = 0; i < copias; i++) {
-    if (platform() === "win32") {
-      await imprimirWindows(impressora, zpl);
+    if (lingua === "pdf") {
+      await imprimirPdf(impressora, conteudo);
+    } else if (platform() === "win32") {
+      await imprimirWindows(impressora, conteudo);
     } else {
-      await executarComEntrada("lp", ["-d", impressora, "-o", "raw"], zpl);
+      await executarComEntrada("lp", ["-d", impressora, "-o", "raw"], conteudo);
     }
+  }
+}
+
+/**
+ * O PDF chega em base64, porque a coluna que carrega o trabalho é de texto.
+ *
+ * Confere que o que chegou é mesmo um PDF antes de mandar para a impressora:
+ * conteúdo trocado vira dezenas de páginas de lixo, e no galpão isso só se
+ * descobre depois que o papel acabou.
+ */
+async function imprimirPdf(impressora, base64) {
+  const limpo = base64.replace(/^data:application\/pdf;base64,/, "").replace(/\s/g, "");
+  const bytes = Buffer.from(limpo, "base64");
+
+  if (bytes.subarray(0, 5).toString("latin1") !== "%PDF-") {
+    throw new Error("o conteúdo não é um PDF — esta impressora está marcada como PDF");
+  }
+
+  const arquivo = join(tmpdir(), `zyntra-${Date.now()}.pdf`);
+  writeFileSync(arquivo, bytes);
+
+  try {
+    if (platform() === "win32") {
+      await imprimirPdfWindows(impressora, arquivo);
+    } else {
+      // O CUPS desenha PDF sozinho — sem `-o raw`, que é justamente o que
+      // faria o arquivo ir cru.
+      await executar("lp", ["-d", impressora, arquivo]);
+    }
+  } finally {
+    try {
+      unlinkSync(arquivo);
+    } catch {
+      // Temporário que não some não é motivo para falhar o trabalho.
+    }
+  }
+}
+
+/** Onde o SumatraPDF pode estar, se alguém o instalou nesta máquina. */
+function acharSumatra() {
+  const lugares = [
+    join(process.env.LOCALAPPDATA ?? "", "ZYNTRA", "SumatraPDF.exe"),
+    join(process.env.LOCALAPPDATA ?? "", "SumatraPDF", "SumatraPDF.exe"),
+    join(process.env.PROGRAMFILES ?? "", "SumatraPDF", "SumatraPDF.exe"),
+  ];
+  return lugares.find((c) => c && existsSync(c)) ?? null;
+}
+
+/**
+ * O Windows não traz nada de linha de comando que imprima PDF.
+ *
+ * Com o SumatraPDF instalado, sai calado e certo. Sem ele, resta o verbo
+ * PrintTo do shell, que só funciona se houver um leitor de PDF registrado
+ * para isso — o Edge, que é o padrão do Windows, não registra. Por isso a
+ * falha aqui diz o que fazer em vez de só dizer que não deu.
+ */
+async function imprimirPdfWindows(impressora, arquivo) {
+  const sumatra = acharSumatra();
+
+  if (sumatra) {
+    await executar(sumatra, [
+      "-print-to",
+      impressora,
+      "-silent",
+      "-exit-when-done",
+      arquivo,
+    ]);
+    return;
+  }
+
+  try {
+    await executar("powershell", [
+      "-NoProfile",
+      "-Command",
+      `$ErrorActionPreference='Stop'; ` +
+        `Start-Process -FilePath ${aspas(arquivo)} -Verb PrintTo ` +
+        `-ArgumentList ${aspas(impressora)} -Wait -PassThru | Out-Null`,
+    ]);
+  } catch (erro) {
+    throw new Error(
+      "esta máquina não sabe imprimir PDF: não há leitor de PDF registrado " +
+        "para impressão. Instale o SumatraPDF, ou marque esta impressora " +
+        `como ZPL no ZYNTRA. (${erro.message})`,
+    );
   }
 }
 
