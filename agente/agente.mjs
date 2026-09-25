@@ -78,6 +78,14 @@ async function principal() {
     registrar(`não consegui enviar a lista de impressoras: ${e.message}`),
   );
 
+  // `--registrar` faz só o login e sai. O instalador precisa disso: se ele
+  // chamasse o agente normal para registrar a máquina, ficaria preso no laço
+  // abaixo e a instalação nunca terminaria.
+  if (process.argv.includes("--registrar")) {
+    registrar("máquina registrada");
+    return 0;
+  }
+
   registrar("online — aguardando trabalhos");
 
   while (!parando) {
@@ -117,6 +125,18 @@ async function principal() {
 // ------------------------------------------------------------ primeira vez
 
 async function primeiraVez() {
+  // O login é digitado, então precisa de um terminal de verdade. Sem isso o
+  // readline some no fim da entrada sem resolver, e o agente sairia com
+  // código de sucesso sem ter registrado nada — falha calada, justamente o
+  // que não pode acontecer na instalação de uma bancada.
+  if (!stdin.isTTY) {
+    console.error(
+      "\n  Esta máquina ainda não está registrada, e o registro precisa ser\n" +
+        "  digitado. Rode o agente numa janela de terminal.\n",
+    );
+    return null;
+  }
+
   const pergunta = createInterface({ input: stdin, output: stdout });
 
   console.log(
@@ -129,6 +149,11 @@ async function primeiraVez() {
   const senha = await pergunta.question("  Senha: ");
   pergunta.close();
   console.log("");
+
+  if (!email || !senha) {
+    console.error("  E-mail e senha são obrigatórios.\n");
+    return null;
+  }
 
   let sessao;
   try {

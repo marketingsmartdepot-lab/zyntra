@@ -43,8 +43,14 @@ jobs:
         run: |
           # Não é teste de impressão — é conferir que a descoberta funciona
           # neste Windows, que é o passo que substituiu o nome digitado à mão.
-          $n = (Get-Printer | Measure-Object).Count
-          Write-Host "$n impressora(s) visíveis para o agente"
+          # Informativo: máquina de CI sem spooler não é motivo para não haver
+          # executável para baixar.
+          try {
+            $n = (Get-Printer -ErrorAction Stop | Measure-Object).Count
+            Write-Host "$n impressora(s) visíveis para o agente"
+          } catch {
+            Write-Host "sem spooler nesta máquina de CI: $($_.Exception.Message)"
+          }
 
       - uses: actions/upload-artifact@v4
         with:

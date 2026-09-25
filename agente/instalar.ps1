@@ -45,8 +45,10 @@ $config = Join-Path $env:USERPROFILE ".zyntra\agente.json"
 if (Test-Path $config) {
   Write-Host "        esta maquina ja esta registrada — pulando o login."
 } else {
-  # Precisa ser na mesma janela: o agente pergunta e-mail e senha aqui.
-  & $exe
+  # Na mesma janela, porque o agente pergunta e-mail e senha aqui. Com
+  # --registrar ele faz o login, manda a lista de impressoras e sai; sem isso
+  # entraria no laco de impressao e a instalacao nunca terminaria.
+  & $exe --registrar
   if (-not (Test-Path $config)) {
     Write-Host ""
     Write-Host "  O login nao foi concluido. Nada foi agendado." -ForegroundColor Red

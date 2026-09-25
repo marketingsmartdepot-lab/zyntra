@@ -50,9 +50,24 @@ writeFileSync(
 );
 
 console.log("gerando o blob…");
-execFileSync(process.execPath, ["--experimental-sea-config", join(SAIDA, "sea.json")], {
-  stdio: "inherit",
-});
+try {
+  execFileSync(process.execPath, ["--experimental-sea-config", join(SAIDA, "sea.json")], {
+    stdio: "inherit",
+  });
+} catch {
+  // Nem todo Node traz o empacotador: o do Homebrew, por exemplo, é compilado
+  // sem ele. Dizer isso é mais útil do que despejar a pilha de erro.
+  console.error(
+    `\n  Este Node (${process.version}, em ${process.execPath}) foi compilado\n` +
+      "  sem o empacotador de executável único, então não dá para gerar o\n" +
+      "  binário aqui.\n\n" +
+      "  O executável do Windows sai do workflow \"Agente de impressão\", na\n" +
+      "  aba Actions do repositório. Para gerar um local, use o Node oficial\n" +
+      "  de nodejs.org.\n\n" +
+      `  O código empacotado ficou pronto em ${join(SAIDA, "agente.cjs")}.\n`,
+  );
+  process.exit(1);
+}
 
 // 3. Uma cópia do próprio Node vira o executável.
 const alvo = join(SAIDA, NOME);
