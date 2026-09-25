@@ -35,6 +35,9 @@ export default async function PaginaExpedicao({
 }: {
   searchParams: Promise<{
     etapa?: string;
+    feito?: string;
+    quantos?: string;
+    recusados?: string;
     pacote?: string;
     lista?: string;
     falha?: string;
@@ -59,6 +62,9 @@ export default async function PaginaExpedicao({
     liberacao,
     etiqueta,
     reprocesso,
+    feito,
+    quantos,
+    recusados,
   } = await searchParams;
   const vista: Vista = pedida && ehVista(pedida) ? pedida : "separar";
   // "listas" não é etapa: a consulta de pacotes continua olhando Separar.
@@ -141,10 +147,15 @@ export default async function PaginaExpedicao({
         explicacao={
           <>
             <Explicacao vista={vista} />
+            {feito && <Feito feito={feito} quantos={quantos} recusados={recusados} />}
             {falha && (
               <span className="rounded-md border border-critico-linha bg-critico-bg px-[9px] py-[3px] font-semibold text-critico">
                 {falha === "todos_ja_em_lista"
                   ? "Esses pacotes já estão numa lista ativa."
+                  : falha === "sem_motivo"
+                    ? "Diga por que está retendo — o motivo vai para o histórico do pacote."
+                  : falha === "nada_selecionado"
+                    ? "Nenhum pedido marcado."
                   : falha === "pacote_fora_de_separar"
                     ? "Só pacote em Separar entra em lista."
                     : "Não foi possível gerar a lista."}
@@ -186,7 +197,7 @@ export default async function PaginaExpedicao({
             <ListaPacotes
               pacotes={pacotes as unknown as LinhaPacote[]}
               etapa={etapaAtiva}
-              selecionavel={vista === "separar"}
+              vista={vista}
             />
             {/* O fechamento mora aqui: quando a caixa está pronta pra envio, o
                 passo seguinte é levá-la para a doca. Mandar a pessoa trocar de
@@ -268,5 +279,45 @@ function Vazio({
         <p className="mt-3 text-[14px] leading-relaxed text-suave">{texto}</p>
       </div>
     </div>
+  );
+}
+
+
+/**
+ * O que a ação em lote fez.
+ *
+ * Diz o número e nomeia o que ficou de fora. "Concluído" esconderia que três
+ * dos dez não foram — e o operador só descobriria quando a caixa errada
+ * chegasse na doca.
+ */
+function Feito({
+  feito,
+  quantos,
+  recusados,
+}: {
+  feito: string;
+  quantos?: string;
+  recusados?: string;
+}) {
+  const lista = (() => {
+    try {
+      return JSON.parse(recusados ?? "[]") as { codigo: string; motivo: string }[];
+    } catch {
+      return [];
+    }
+  })();
+
+  const verbo = feito === "retidos" ? "retidos" : "devolvidos para a esteira";
+
+  return (
+    <span className="rounded-md border border-ok-linha bg-ok-bg px-[9px] py-[3px] font-semibold text-ok">
+      {quantos} {Number(quantos) === 1 ? "pedido" : "pedidos"} {verbo}
+      {lista.length > 0 && (
+        <span className="font-normal text-critico">
+          {" · "}
+          {lista.map((r) => `${r.codigo} (${r.motivo})`).join(", ")} de fora
+        </span>
+      )}
+    </span>
   );
 }

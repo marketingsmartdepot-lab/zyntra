@@ -1,16 +1,25 @@
 import Link from "next/link";
 import type { Etapa, LinhaPacote } from "@/lib/supabase/tipos";
+import { Botao } from "@/components/botao";
 import { gerarLista } from "./listas/acoes";
+import { reterPacotes, tirarDoRetido } from "./retencao-acoes";
 
 export function ListaPacotes({
   pacotes,
   etapa,
-  selecionavel,
+  vista,
 }: {
   pacotes: LinhaPacote[];
   etapa: Etapa;
-  selecionavel?: boolean;
+  /** Qual aba está aberta: é ela que decide quais ações cabem. */
+  vista: string;
 }) {
+  // Conferir fica de fora de propósito: ali é uma caixa por vez na bancada, e
+  // ação em massa desfaz justamente o que a conferência existe para garantir.
+  const podeReter = ["aberto", "faturado", "separar"].includes(vista);
+  const podeListar = vista === "separar";
+  const podeDevolver = vista === "retido";
+  const selecionavel = podeReter || podeDevolver;
   const agora = Date.now();
 
   const tabela = (
@@ -152,22 +161,66 @@ export function ListaPacotes({
   if (!selecionavel) return tabela;
 
   return (
-    <form action={gerarLista} className="flex flex-1 flex-col">
+    <form className="flex flex-1 flex-col">
+      <input type="hidden" name="vista" value={vista} />
       {tabela}
-      <div className="mt-auto flex items-center gap-3 border-t border-linha bg-fundo px-5 py-3">
-        <span className="max-w-[72ch] text-[12.5px] text-suave">
-          Marque os pedidos e gere a lista: a folha sai na impressora desta
-          bancada e os pedidos passam para <b>Conferir</b> no mesmo ato. A
-          lista pode cruzar contas e empresas — quem anda pelo corredor não
-          quer uma lista por CNPJ.
-        </span>
+
+      <div className="mt-auto flex flex-wrap items-center gap-3 border-t border-linha bg-fundo px-5 py-3">
+        {podeListar && (
+          <span className="max-w-[60ch] text-[12.5px] text-suave">
+            Marque os pedidos e gere a lista: a folha sai na impressora desta
+            bancada e os pedidos passam para <b>Conferir</b> no mesmo ato.
+          </span>
+        )}
+
+        {podeDevolver && (
+          <span className="max-w-[60ch] text-[12.5px] text-suave">
+            Devolver manda cada pedido de volta para a etapa em que ele estava
+            antes de ser retido — não para o começo. Nota, etiqueta e separação
+            já feitas continuam valendo.
+          </span>
+        )}
+
         <span className="flex-1" />
-        <button
-          type="submit"
-          className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
-        >
-          Gerar lista de separação
-        </button>
+
+        {podeReter && (
+          <span className="flex items-center gap-2">
+            <input
+              id="motivo-retencao"
+              name="motivo"
+              aria-label="Por que está retendo"
+              placeholder="por que está retendo"
+              className="w-[240px] rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13px]"
+            />
+            <Botao
+              formAction={reterPacotes}
+              trabalhando="Retendo…"
+              className="rounded-lg border border-atencao-linha px-4 py-[9px] text-[13px] font-semibold text-atencao"
+            >
+              Reter
+            </Botao>
+          </span>
+        )}
+
+        {podeDevolver && (
+          <Botao
+            formAction={tirarDoRetido}
+            trabalhando="Devolvendo…"
+            className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
+          >
+            Devolver para a esteira
+          </Botao>
+        )}
+
+        {podeListar && (
+          <Botao
+            formAction={gerarLista}
+            trabalhando="Gerando a lista…"
+            className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
+          >
+            Gerar lista de separação
+          </Botao>
+        )}
       </div>
     </form>
   );
