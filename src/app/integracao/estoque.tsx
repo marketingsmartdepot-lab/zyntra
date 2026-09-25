@@ -1,4 +1,5 @@
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { ConexaoBling } from "./bling";
 import {
   salvarDeposito,
   sincronizarCatalogo,
@@ -37,7 +38,16 @@ type Baixa = {
  * acontece, a peça segue disponível e o canal pode vender de novo — e entre a
  * venda e a expedição passam horas.
  */
-export async function Estoque({ falha }: { falha?: string }) {
+export async function Estoque({
+  falha,
+  bling,
+  origem,
+}: {
+  falha?: string;
+  /** O que voltou da autorização do Bling. */
+  bling?: string;
+  origem: string;
+}) {
   const supabase = await criarClienteServidor();
 
   const [{ data: config }, { data: fila }, { data: semRef, count: totalSemRef }] =
@@ -72,6 +82,10 @@ export async function Estoque({ falha }: { falha?: string }) {
   return (
     <div className="flex flex-col gap-5 p-5">
       {falha && <Aviso resultado={falha} />}
+
+      {/* A conexão vem antes do depósito: sem ela, escolher depósito é
+          preencher um formulário que não tem para onde mandar nada. */}
+      <ConexaoBling resultado={bling} origem={origem} />
 
       <form
         action={salvarDeposito}

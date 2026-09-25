@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { Casca } from "@/components/casca";
 import { Barra, Indicador } from "@/components/barra";
@@ -26,7 +27,7 @@ type Aba = (typeof ABAS)[number]["chave"];
 export default async function PaginaIntegracao({
   searchParams,
 }: {
-  searchParams: Promise<{ aba?: string; falha?: string }>;
+  searchParams: Promise<{ aba?: string; falha?: string; bling?: string }>;
 }) {
   const supabase = await criarClienteServidor();
   const {
@@ -34,7 +35,14 @@ export default async function PaginaIntegracao({
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar?destino=/integracao");
 
-  const { aba: pedida, falha } = await searchParams;
+  const { aba: pedida, falha, bling } = await searchParams;
+
+  // O endereço público de retorno do OAuth sai daqui, não de uma constante:
+  // em produção e na máquina local ele é diferente, e cravar um dos dois
+  // faria a tela ensinar o endereço errado na outra.
+  const cabecalhos = await headers();
+  const anfitriao = cabecalhos.get("host") ?? "localhost:3000";
+  const origem = `${anfitriao.startsWith("localhost") ? "http" : "https"}://${anfitriao}`;
   const aba: Aba = ABAS.some((a) => a.chave === pedida)
     ? (pedida as Aba)
     : "contas";
@@ -166,7 +174,9 @@ export default async function PaginaIntegracao({
         {aba === "contas" && <Contas falha={falha} />}
         {aba === "impressoras" && <Impressoras />}
         {aba === "operadores" && <Operadores falha={falha} />}
-        {aba === "estoque" && <Estoque falha={falha} />}
+        {aba === "estoque" && (
+          <Estoque falha={falha} bling={bling} origem={origem} />
+        )}
         {aba === "cadastros" && <Cadastros falha={falha} />}
         {aba === "equipe" && <Equipe falha={falha} />}
       </div>
