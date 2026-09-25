@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { Botao } from "@/components/botao";
 import { buscarEans, excluirSkus, sincronizarCatalogo } from "./acoes";
 
 type Resumo = {
@@ -119,12 +120,12 @@ export async function ListaCatalogo({
             )}
           </p>
           <form action={buscarEans} className="mt-2 flex items-center gap-3">
-            <button
-              type="submit"
+            <Botao
+              trabalhando="Consultando o Bling…"
               className="rounded-lg border border-atencao-linha bg-superficie px-3 py-[7px] text-[12.5px] font-semibold text-atencao"
             >
               Buscar agora no Bling
-            </button>
+            </Botao>
             <span className="text-[12px] text-atencao">
               A busca já roda sozinha de minuto em minuto. O botão é para não
               esperar — vai uma leva de cada vez, porque o EAN só existe no
@@ -169,12 +170,12 @@ export async function ListaCatalogo({
         <span className="flex-1" />
 
         <form action={sincronizarCatalogo}>
-          <button
-            type="submit"
+          <Botao
+            trabalhando="Trazendo o catálogo…"
             className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
           >
             Sincronizar com o Bling
-          </button>
+          </Botao>
         </form>
       </div>
 
@@ -288,12 +289,12 @@ export async function ListaCatalogo({
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
+            <Botao
+              trabalhando="Apagando…"
               className="rounded-lg border border-critico-linha px-4 py-[9px] text-[13px] font-semibold text-critico"
             >
               Apagar selecionados
-            </button>
+            </Botao>
             <span className="max-w-[64ch] text-[12.5px] text-suave">
               Apaga de vez. Produto que já passou por conferência, baixa, anúncio
               ou kit é recusado pelo banco — esse volta nomeado, porque apagá-lo

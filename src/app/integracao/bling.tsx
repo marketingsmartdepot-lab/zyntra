@@ -1,4 +1,5 @@
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { Botao } from "@/components/botao";
 import {
   conectarBling,
   desconectarBling,
@@ -167,12 +168,12 @@ export async function ConexaoBling({
                 className="w-[280px] rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13px]"
               />
             </div>
-            <button
-              type="submit"
+            <Botao
+              trabalhando="Guardando…"
               className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
             >
               Guardar
-            </button>
+            </Botao>
             <span className="max-w-[46ch] text-[12.5px] text-suave">
               O secret vai direto para o banco e não volta para nenhuma tela.
               Trocar o aplicativo apaga a autorização atual — token de um app
@@ -199,7 +200,9 @@ export async function ConexaoBling({
               <>
                 {" "}
                 · {s.renovacoes}{" "}
-                {s.renovacoes === 1 ? "renovação" : "renovações"} automáticas
+                {s.renovacoes === 1
+                  ? "renovação automática"
+                  : "renovações automáticas"}
               </>
             )}
             .
@@ -214,13 +217,13 @@ export async function ConexaoBling({
         )}
 
         <form action={conectarBling} className="mt-3">
-          <button
-            type="submit"
+          <Botao
             disabled={!configurada}
+            trabalhando="Levando você ao Bling…"
             className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
             {conectada ? "Autorizar de novo" : "Conectar o Bling"}
-          </button>
+          </Botao>
         </form>
 
         {!configurada && (
