@@ -38,6 +38,8 @@ type Baixa = {
  * acontece, a peça segue disponível e o canal pode vender de novo — e entre a
  * venda e a expedição passam horas.
  */
+type Deposito = { id: string; nome: string; padrao: boolean };
+
 export async function Estoque({
   falha,
   bling,
@@ -71,6 +73,14 @@ export async function Estoque({
       .limit(20),
   ]);
 
+  // O id do depósito não existe na interface do Bling — só na API. Por isso a
+  // lista é buscada, não digitada: é a mesma coisa que a Lexos faz.
+  const { data: listaDepositos } = await supabase.rpc("listar_depositos_erp");
+  const dep = (Array.isArray(listaDepositos) ? listaDepositos[0] : listaDepositos) as
+    | { ok: boolean; motivo: string; detalhe: string | null; depositos: Deposito[] | null }
+    | null;
+  const depositos = dep?.ok ? (dep.depositos ?? []) : [];
+
   const c = (config ?? null) as Config | null;
   const pendentes = ((fila ?? []) as unknown as Baixa[]).filter(
     (b) => b.situacao === "pendente",
@@ -98,21 +108,53 @@ export async function Estoque({
           De qual depósito o estoque sai. Hoje é um só. Se mudar, as baixas
           novas vão para o depósito novo — e um estorno de baixa antiga volta
           para onde a peça realmente saiu, não para o depósito atual.
+          {depositos.length > 0 && (
+            <>
+              {" "}
+              A lista vem do próprio Bling: o id do depósito não aparece na
+              interface dele, só na API.
+            </>
+          )}
         </p>
 
         <label
           htmlFor="erp-deposito"
           className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
         >
-          Identificador do depósito
+          Depósito
         </label>
-        <input
-          id="erp-deposito"
-          name="deposito"
-          defaultValue={c?.deposito_ref ?? ""}
-          placeholder="o id do depósito no Bling"
-          className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13.5px]"
-        />
+
+        {depositos.length > 0 ? (
+          <select
+            id="erp-deposito"
+            name="deposito"
+            defaultValue={c?.deposito_ref ?? ""}
+            className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
+          >
+            <option value="">— escolha o depósito —</option>
+            {depositos.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.nome}
+                {d.padrao ? " (padrão)" : ""}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <>
+            {/* Sem a lista, o campo continua existindo: quem já tem o id
+                anotado não fica preso esperando a conexão voltar. */}
+            <input
+              id="erp-deposito"
+              name="deposito"
+              defaultValue={c?.deposito_ref ?? ""}
+              placeholder="o id do depósito no Bling"
+              className="mb-2 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13.5px]"
+            />
+            <p className="mb-3 text-[12.5px] text-suave">
+              <SemLista motivo={dep?.motivo} detalhe={dep?.detalhe} />
+            </p>
+          </>
+        )}
 
         <label
           htmlFor="erp-ativo"
@@ -373,5 +415,36 @@ function Selo({
     >
       {children}
     </span>
+  );
+}
+
+
+/**
+ * Por que a lista não veio.
+ *
+ * Quase sempre é a conexão: listar depósito exige token. Dizer isso é o que
+ * separa "conecte o Bling" de "procure o número em algum lugar".
+ */
+function SemLista({ motivo, detalhe }: { motivo?: string; detalhe?: string | null }) {
+  const texto: Record<string, string> = {
+    sem_conexao:
+      "Conecte o Bling acima para escolher o depósito numa lista — o id dele não aparece na interface do Bling, só na API.",
+    conexao_expirada:
+      "A autorização do Bling expirou. Autorize de novo acima e a lista volta.",
+    so_admin: "Só um administrador vê a lista de depósitos.",
+    nenhum_deposito: "O Bling respondeu sem nenhum depósito.",
+    rede: "Não foi possível alcançar o Bling para buscar os depósitos.",
+    recusado: "O Bling recusou a consulta dos depósitos.",
+  };
+
+  return (
+    <>
+      {texto[motivo ?? ""] ?? "A lista de depósitos não pôde ser carregada."}
+      {detalhe && (
+        <span className="mt-1 block font-mono text-[11.5px] text-critico">
+          {detalhe}
+        </span>
+      )}
+    </>
   );
 }
