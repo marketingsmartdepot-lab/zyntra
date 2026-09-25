@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Casca } from "@/components/casca";
+import { Barra, Indicador } from "@/components/barra";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Doca, type EntregaResumo } from "./doca";
 import { EstacaoDeSaida, type SaidaResumo } from "./saida";
@@ -76,6 +77,21 @@ export default async function PaginaLogistica({
   // volta para a lista em vez de mostrar um leitor que não registra nada.
   const turno = await turnoDaMaquina();
 
+  // O acumulado do mês fica visível em toda aba da Logística: é o número que
+  // vira dinheiro no fim do mês, e antes só aparecia se alguém clicasse em
+  // Fechamento.
+  const primeiroDia = new Date();
+  primeiroDia.setDate(1);
+  const { data: doMes } = await supabase
+    .from("fechamento_custo_etiqueta")
+    .select("total")
+    .gte("dia", primeiroDia.toISOString().slice(0, 10));
+
+  const acumulado = ((doMes ?? []) as { total: number | string }[]).reduce(
+    (t, l) => t + Number(l.total),
+    0,
+  );
+
   const noCarrinho =
     bipar === "1" && entregaId
       ? ((entregas ?? []) as EntregaResumo[]).find((e) => e.id === entregaId)
@@ -88,41 +104,53 @@ export default async function PaginaLogistica({
 
   return (
     <Casca frente="logistica" email={user.email ?? "sem e-mail"}>
-      <nav
-        aria-label="Seções da logística"
-        className="flex shrink-0 items-stretch gap-[30px] border-b border-linha bg-superficie px-5"
-      >
-        <AbaLink
-          chave="doca"
-          rotulo="Doca"
-          contagem={String(naDoca)}
-          ativa={aba === "doca"}
-        />
-        <AbaLink
-          chave="saida"
-          rotulo="Estação de saída"
-          contagem={String(abertas.length)}
-          ativa={aba === "saida"}
-        />
-        <span className="my-[15px] w-px shrink-0 bg-linha" />
-        <AbaLink
-          chave="fechamento"
-          rotulo="Fechamento"
-          contagem={mesAtual()}
-          pequena
-          ativa={aba === "fechamento"}
-        />
-        <span className="flex-1" />
-      </nav>
-
-      <p className="shrink-0 border-b border-linha bg-fundo px-5 py-[11px] text-[12.5px] text-suave">
-        {aba === "doca" &&
-          "Tudo aqui já foi conferido e lacrado na Expedição. A doca não abre caixa — ela registra quem levou para fora."}
-        {aba === "saida" &&
-          "A segunda bipagem: contra a relação que sai pela porta, não contra o que o cliente comprou."}
-        {aba === "fechamento" &&
-          "Soma dos valores congelados no instante do bipe. Só o Flex tem custo."}
-      </p>
+      <Barra
+        rotulo="Seções da logística"
+        abas={[
+          {
+            chave: "doca",
+            href: "/logistica?aba=doca",
+            rotulo: "Doca",
+            contagem: naDoca,
+            ativa: aba === "doca",
+          },
+          {
+            chave: "saida",
+            href: "/logistica?aba=saida",
+            rotulo: "Estação de saída",
+            contagem: abertas.length,
+            ativa: aba === "saida",
+          },
+          {
+            chave: "fechamento",
+            href: "/logistica?aba=fechamento",
+            rotulo: "Fechamento",
+            // Fechamento não conta pacote: conta mês.
+            legenda: mesAtual().toLowerCase(),
+            ativa: aba === "fechamento",
+            separadaAntes: true,
+          },
+        ]}
+        direita={
+          <Indicador
+            rotulo={`Flex em ${mesAtual().toLowerCase()}`}
+            valor={acumulado.toLocaleString("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+            })}
+          />
+        }
+        explicacao={
+          <>
+            {aba === "doca" &&
+              "Tudo aqui já foi conferido e lacrado na Expedição. A doca não abre caixa — ela registra quem levou para fora."}
+            {aba === "saida" &&
+              "A segunda bipagem: contra a relação que sai pela porta, não contra o que o cliente comprou."}
+            {aba === "fechamento" &&
+              "Soma dos valores congelados no instante do bipe. Só o Flex tem custo."}
+          </>
+        }
+      />
 
       {falha && (
         <p className="shrink-0 border-b border-critico-linha bg-critico-bg px-5 py-[10px] text-[12.5px] font-semibold text-critico">
@@ -187,37 +215,3 @@ function mesAtual() {
   return m.charAt(0).toUpperCase() + m.slice(1);
 }
 
-function AbaLink({
-  chave,
-  rotulo,
-  contagem,
-  ativa,
-  pequena,
-}: {
-  chave: Aba;
-  rotulo: string;
-  contagem: string;
-  ativa: boolean;
-  pequena?: boolean;
-}) {
-  return (
-    <Link
-      href={`/logistica?aba=${chave}`}
-      aria-current={ativa ? "page" : undefined}
-      className={`flex shrink-0 flex-col gap-[2px] border-b-[3px] py-[13px] pb-[14px] no-underline ${
-        ativa ? "border-tinta text-tinta" : "border-transparent text-suave"
-      }`}
-    >
-      <span className="text-[10.5px] font-semibold uppercase tracking-[0.13em]">
-        {rotulo}
-      </span>
-      <span
-        className={`font-bold leading-none tracking-[-0.02em] tabular-nums ${
-          pequena ? "text-[17px]" : "text-[25px]"
-        } ${ativa ? "text-tinta" : "text-[#43464D]"}`}
-      >
-        {contagem}
-      </span>
-    </Link>
-  );
-}

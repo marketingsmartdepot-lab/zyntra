@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Casca } from "@/components/casca";
+import { Barra, Indicador } from "@/components/barra";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Contas } from "./contas";
 import { Impressoras } from "./impressoras";
@@ -52,6 +53,17 @@ export default async function PaginaIntegracao({
     .select("id", { count: "exact", head: true })
     .neq("situacao", "enviada");
 
+  // A saúde das conexões fica visível em toda aba: conexão caída para a
+  // operação inteira, e antes só se descobria entrando na aba certa.
+  const { data: saude } = await supabase
+    .from("saude_das_conexoes")
+    .select("conectada, expirada")
+    .eq("alvo", "mercado_livre");
+
+  const linhas = (saude ?? []) as { conectada: boolean; expirada: boolean }[];
+  const conectadas = linhas.filter((l) => l.conectada).length;
+  const expiradas = linhas.filter((l) => l.expirada).length;
+
   const { count: empresas } = await supabase
     .from("empresas")
     .select("id", { count: "exact", head: true })
@@ -59,55 +71,78 @@ export default async function PaginaIntegracao({
 
   return (
     <Casca frente="integracao" email={user.email ?? "sem e-mail"}>
-      <nav
-        aria-label="Seções da integração"
-        className="flex shrink-0 items-stretch gap-[30px] border-b border-linha bg-superficie px-5"
-      >
-        <AbaLink
-          chave="contas"
-          rotulo="Conexão das contas"
-          contagem={contas ?? 0}
-          ativa={aba === "contas"}
-        />
-        <AbaLink
-          chave="impressoras"
-          rotulo="Estações e impressoras"
-          contagem={impressoras ?? 0}
-          ativa={aba === "impressoras"}
-        />
-        <AbaLink
-          chave="operadores"
-          rotulo="Operadores"
-          contagem={operadores ?? 0}
-          ativa={aba === "operadores"}
-        />
-        <AbaLink
-          chave="estoque"
-          rotulo="Estoque"
-          contagem={baixasNaFila ?? 0}
-          ativa={aba === "estoque"}
-        />
-        <AbaLink
-          chave="cadastros"
-          rotulo="Cadastros"
-          contagem={empresas ?? 0}
-          ativa={aba === "cadastros"}
-        />
-        <span className="flex-1" />
-      </nav>
-
-      <p className="shrink-0 border-b border-linha bg-fundo px-5 py-[11px] text-[12.5px] text-suave">
-        {aba === "contas" &&
-          "Quem fatura e de quem é o estoque são coisas separadas. Aqui isso fica explícito."}
-        {aba === "impressoras" &&
-          "A impressora é alcançada por um agente na máquina da bancada. Navegador não fala com USB."}
-        {aba === "operadores" &&
-          "Quem trabalha na bancada não usa e-mail e senha: entra com nome e PIN. São coisas separadas de propósito."}
-        {aba === "estoque" &&
-          "A baixa acontece quando a NF-e é autorizada, não quando a caixa sai — senão a peça segue vendável por horas."}
-        {aba === "cadastros" &&
-          "O que o sistema lê e ninguém tinha onde criar. Muda raramente, então fica tudo junto."}
-      </p>
+      <Barra
+        rotulo="Seções da integração"
+        abas={[
+          {
+            chave: "contas",
+            href: "/integracao?aba=contas",
+            rotulo: "Conexão das contas",
+            contagem: contas ?? 0,
+            ativa: aba === "contas",
+          },
+          {
+            chave: "impressoras",
+            href: "/integracao?aba=impressoras",
+            rotulo: "Estações e impressoras",
+            contagem: impressoras ?? 0,
+            ativa: aba === "impressoras",
+          },
+          {
+            chave: "operadores",
+            href: "/integracao?aba=operadores",
+            rotulo: "Operadores",
+            contagem: operadores ?? 0,
+            ativa: aba === "operadores",
+          },
+          {
+            chave: "estoque",
+            href: "/integracao?aba=estoque",
+            rotulo: "Estoque",
+            contagem: baixasNaFila ?? 0,
+            ativa: aba === "estoque",
+            // Baixa parada na fila é problema, não volume de trabalho.
+            tom: "atencao" as const,
+          },
+          {
+            chave: "cadastros",
+            href: "/integracao?aba=cadastros",
+            rotulo: "Cadastros",
+            // Cadastro não é fila: contar empresas não diz nada a ninguém.
+            ativa: aba === "cadastros",
+            separadaAntes: true,
+          },
+        ]}
+        direita={
+          conectadas === 0 ? (
+            <Indicador valor="Nenhuma conta conectada" tom="critico" />
+          ) : expiradas > 0 ? (
+            <Indicador
+              valor={`${expiradas} ${expiradas === 1 ? "conexão expirada" : "conexões expiradas"}`}
+              tom="critico"
+            />
+          ) : (
+            <Indicador
+              valor={`${conectadas} ${conectadas === 1 ? "conta conectada" : "contas conectadas"}`}
+              tom="ok"
+            />
+          )
+        }
+        explicacao={
+          <>
+            {aba === "contas" &&
+              "Quem fatura e de quem é o estoque são coisas separadas. Aqui isso fica explícito."}
+            {aba === "impressoras" &&
+              "A impressora é alcançada por um agente na máquina da bancada. Navegador não fala com USB."}
+            {aba === "operadores" &&
+              "Quem trabalha na bancada não usa e-mail e senha: entra com nome e PIN. São coisas separadas de propósito."}
+            {aba === "estoque" &&
+              "A baixa acontece quando a NF-e é autorizada, não quando a caixa sai — senão a peça segue vendável por horas."}
+            {aba === "cadastros" &&
+              "O que o sistema lê e ninguém tinha onde criar. Muda raramente, então fica tudo junto."}
+          </>
+        }
+      />
 
       <div className="flex flex-1 flex-col bg-superficie">
         {aba === "contas" && <Contas falha={falha} />}
@@ -120,35 +155,3 @@ export default async function PaginaIntegracao({
   );
 }
 
-function AbaLink({
-  chave,
-  rotulo,
-  contagem,
-  ativa,
-}: {
-  chave: Aba;
-  rotulo: string;
-  contagem: number;
-  ativa: boolean;
-}) {
-  return (
-    <Link
-      href={`/integracao?aba=${chave}`}
-      aria-current={ativa ? "page" : undefined}
-      className={`flex shrink-0 flex-col gap-[2px] border-b-[3px] py-[13px] pb-[14px] no-underline ${
-        ativa ? "border-tinta text-tinta" : "border-transparent text-suave"
-      }`}
-    >
-      <span className="text-[10.5px] font-semibold uppercase tracking-[0.13em]">
-        {rotulo}
-      </span>
-      <span
-        className={`text-[25px] font-bold leading-none tracking-[-0.02em] tabular-nums ${
-          ativa ? "text-tinta" : "text-[#43464D]"
-        }`}
-      >
-        {contagem}
-      </span>
-    </Link>
-  );
-}

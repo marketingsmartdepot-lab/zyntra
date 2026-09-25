@@ -9,6 +9,7 @@ import {
   type LinhaPacote,
   type Vista,
 } from "@/lib/supabase/tipos";
+import { Barra } from "@/components/barra";
 import { ListaPacotes } from "./lista";
 import { PainelDetalhe } from "./conferencia/painel";
 import { PainelListas } from "./listas/painel";
@@ -91,57 +92,63 @@ export default async function PaginaExpedicao({
       email={user.email ?? "sem e-mail"}
       compacta={vista === "conferir" && Boolean(pacote)}
     >
-      <nav
-        aria-label="Etapas da esteira"
-        className="flex shrink-0 items-stretch gap-[30px] overflow-x-auto border-b border-linha bg-superficie px-5"
-      >
-        {ABAS_EXPEDICAO.map((a) => (
-          <Aba
-            key={a.etapa}
-            etapa={a.etapa}
-            rotulo={a.rotulo}
-            contagem={porEtapa.get(a.etapa) ?? 0}
-            ativa={vista === a.etapa}
-          />
-        ))}
-
-        <AbaVista
-          chave="listas"
-          rotulo="Lista de separação"
-          contagem={listasAbertas ?? 0}
-          ativa={vista === "listas"}
-        />
-
-        <span className="my-[15px] w-px shrink-0 bg-linha" />
-
-        <Aba
-          etapa="retido"
-          rotulo="Retidos"
-          contagem={porEtapa.get("retido") ?? 0}
-          ativa={vista === "retido"}
-          foraDaEsteira
-        />
-
-        <span className="flex-1" />
-      </nav>
-
-      <div className="flex shrink-0 items-center gap-2 border-b border-linha bg-fundo px-5 py-[11px] text-[12.5px] text-suave">
-        <Explicacao vista={vista} />
-        {falha && (
-          <span className="rounded-md border border-critico-linha bg-critico-bg px-[9px] py-[3px] font-semibold text-critico">
-            {falha === "todos_ja_em_lista"
-              ? "Esses pacotes já estão numa lista ativa."
-              : falha === "pacote_fora_de_separar"
-                ? "Só pacote em Separar entra em lista."
-                : "Não foi possível gerar a lista."}
+      <Barra
+        rotulo="Etapas da esteira"
+        abas={[
+          ...ABAS_EXPEDICAO.map((a) => ({
+            chave: a.etapa,
+            href: `/expedicao?etapa=${a.etapa}`,
+            rotulo: a.rotulo,
+            contagem: porEtapa.get(a.etapa) ?? 0,
+            ativa: vista === a.etapa,
+            // Cor só onde ela significa "olhe aqui": pedido parado em Aberto
+            // e nota pendente em Faturado. O resto é contagem.
+            tom:
+              a.etapa === "aberto"
+                ? ("critico" as const)
+                : a.etapa === "faturado"
+                  ? ("atencao" as const)
+                  : undefined,
+          })),
+          {
+            chave: "listas",
+            href: "/expedicao?etapa=listas",
+            rotulo: "Lista de separação",
+            contagem: listasAbertas ?? 0,
+            ativa: vista === "listas",
+          },
+          {
+            chave: "retido",
+            href: "/expedicao?etapa=retido",
+            rotulo: "Retidos",
+            contagem: porEtapa.get("retido") ?? 0,
+            ativa: vista === "retido",
+            tom: "atencao" as const,
+            // Retido está FORA da esteira — por isso separado do grupo.
+            separadaAntes: true,
+          },
+        ]}
+        explicacao={
+          <>
+            <Explicacao vista={vista} />
+            {falha && (
+              <span className="rounded-md border border-critico-linha bg-critico-bg px-[9px] py-[3px] font-semibold text-critico">
+                {falha === "todos_ja_em_lista"
+                  ? "Esses pacotes já estão numa lista ativa."
+                  : falha === "pacote_fora_de_separar"
+                    ? "Só pacote em Separar entra em lista."
+                    : "Não foi possível gerar a lista."}
+              </span>
+            )}
+          </>
+        }
+        rodapeDireita={
+          <span>
+            <b className="font-semibold text-tinta">{pacotes?.length ?? 0}</b>{" "}
+            {(pacotes?.length ?? 0) === 1 ? "pacote" : "pacotes"}
           </span>
-        )}
-        <span className="flex-1" />
-        <span>
-          <b className="font-semibold text-tinta">{pacotes?.length ?? 0}</b>{" "}
-          {pacotes?.length === 1 ? "pacote" : "pacotes"}
-        </span>
-      </div>
+        }
+      />
 
       <div className="flex flex-1 flex-col bg-superficie">
         {vista === "listas" ? (
@@ -176,85 +183,7 @@ export default async function PaginaExpedicao({
   );
 }
 
-function Aba({
-  etapa,
-  rotulo,
-  contagem,
-  ativa,
-  foraDaEsteira,
-}: {
-  etapa: Etapa;
-  rotulo: string;
-  contagem: number;
-  ativa: boolean;
-  foraDaEsteira?: boolean;
-}) {
-  const alerta =
-    (etapa === "aberto" || etapa === "retido") && contagem > 0
-      ? etapa === "aberto"
-        ? "text-critico"
-        : "text-atencao"
-      : etapa === "faturado" && contagem > 0
-        ? "text-atencao"
-        : ativa
-          ? "text-tinta"
-          : "text-[#43464D]";
 
-  return (
-    <Link
-      href={`/expedicao?etapa=${etapa}`}
-      aria-current={ativa ? "page" : undefined}
-      className={`flex shrink-0 flex-col gap-[2px] border-b-[3px] py-[13px] pb-[14px] no-underline ${
-        ativa ? "border-tinta text-tinta" : "border-transparent text-suave"
-      }`}
-    >
-      <span className="flex items-center gap-[6px] text-[10.5px] font-semibold uppercase tracking-[0.13em]">
-        {foraDaEsteira && (
-          <span className="h-[6px] w-[6px] rounded-full bg-atencao" />
-        )}
-        {rotulo}
-      </span>
-      <span
-        className={`text-[25px] font-bold leading-none tracking-[-0.02em] tabular-nums ${alerta}`}
-      >
-        {contagem}
-      </span>
-    </Link>
-  );
-}
-
-function AbaVista({
-  chave,
-  rotulo,
-  contagem,
-  ativa,
-}: {
-  chave: string;
-  rotulo: string;
-  contagem: number;
-  ativa: boolean;
-}) {
-  return (
-    <Link
-      href={`/expedicao?etapa=${chave}`}
-      aria-current={ativa ? "page" : undefined}
-      className={`flex shrink-0 flex-col gap-[2px] border-b-[3px] py-[13px] pb-[14px] no-underline ${
-        ativa ? "border-tinta text-tinta" : "border-transparent text-suave"
-      }`}
-    >
-      <span className="text-[10.5px] font-semibold uppercase tracking-[0.13em]">
-        {rotulo}
-      </span>
-      <span
-        className={`text-[25px] font-bold leading-none tracking-[-0.02em] tabular-nums ${
-          ativa ? "text-tinta" : "text-[#43464D]"
-        }`}
-      >
-        {contagem}
-      </span>
-    </Link>
-  );
-}
 
 function Explicacao({ vista }: { vista: Vista }) {
   const texto: Partial<Record<Vista, string>> = {
