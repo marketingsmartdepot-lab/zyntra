@@ -13,7 +13,7 @@
 
 import { execFileSync } from "node:child_process";
 import { build } from "esbuild";
-import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { platform } from "node:os";
 
@@ -72,6 +72,10 @@ try {
 // 3. Uma cópia do próprio Node vira o executável.
 const alvo = join(SAIDA, NOME);
 copyFileSync(process.execPath, alvo);
+
+// A cópia herda as permissões do original, e há Node instalado só-leitura (o
+// do Homebrew é r-xr-xr-x). O postject precisa escrever no arquivo.
+chmodSync(alvo, 0o755);
 
 // A assinatura do macOS quebra ao injetar; é preciso removê-la antes e
 // reassinar depois, senão o binário nem abre.
