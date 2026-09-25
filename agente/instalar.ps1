@@ -30,6 +30,11 @@ Write-Host ""
 # 1 --------------------------------------------------------------- copiar
 New-Item -ItemType Directory -Force -Path $destino | Out-Null
 
+# Arquivo que veio da internet chega com uma marca, e o Windows barra o
+# executavel com um aviso de tela azul ("Windows protegeu o seu PC"). Tirar a
+# marca antes de copiar evita esse susto no galpao.
+Unblock-File -Path $origem -ErrorAction SilentlyContinue
+
 # Se já estiver rodando, precisa parar antes: arquivo em uso não se sobrescreve.
 Get-Process -Name "ZyntraAgente" -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 400

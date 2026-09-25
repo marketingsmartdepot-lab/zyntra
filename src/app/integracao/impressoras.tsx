@@ -260,7 +260,20 @@ function ComoInstalar({ compacto }: { compacto: boolean }) {
 
       <ol className="m-0 mt-2 max-w-[84ch] list-decimal pl-5 text-[13px] leading-relaxed text-suave">
         <li className="mb-1">
-          Copie para o computador da bancada a pasta com{" "}
+          Baixe o instalador:{" "}
+          <a
+            href="https://github.com/marketingsmartdepot-lab/zyntra/actions/workflows/agente.yml"
+            target="_blank"
+            rel="noreferrer"
+            className="font-semibold underline"
+          >
+            abra a última execução verde
+          </a>{" "}
+          e, no fim da página, pegue{" "}
+          <code className="font-mono">ZyntraAgente-windows</code>.
+        </li>
+        <li className="mb-1">
+          Descompacte no computador da bancada. Vêm dois arquivos:{" "}
           <code className="font-mono">ZyntraAgente.exe</code> e{" "}
           <code className="font-mono">instalar.ps1</code>.
         </li>

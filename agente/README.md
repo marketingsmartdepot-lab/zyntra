@@ -7,10 +7,12 @@ rede — não há como imprimir a partir do servidor.
 
 ## Instalar numa máquina do galpão
 
-Copie para o computador da bancada os dois arquivos — `ZyntraAgente.exe` e
-`instalar.ps1` — e rode o instalador (botão direito, **Executar com o
-PowerShell**). Não precisa de Node instalado na bancada: o executável já traz
-tudo dentro.
+Baixe o instalador na aba **Actions** do repositório, no workflow *Agente de
+impressão*: abra a última execução verde e pegue `ZyntraAgente-windows`, no fim
+da página. Descompacte no computador da bancada e rode `instalar.ps1` (botão
+direito, **Executar com o PowerShell**).
+
+Não precisa de Node instalado na bancada: o executável já traz tudo dentro.
 
 O instalador copia o agente, faz o login e registra para abrir sozinho toda vez
 que alguém entrar no Windows.
