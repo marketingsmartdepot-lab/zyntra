@@ -43,3 +43,7 @@ next-env.d.ts
 # manter o exemplo versionado
 !.env.example
 !.env.exemplo
+
+# agente de impressão
+/agente/node_modules
+/agente/dist

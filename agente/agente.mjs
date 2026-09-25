@@ -48,48 +48,70 @@ for (const sinal of ["SIGINT", "SIGTERM"]) {
   });
 }
 
-registrar(`${VERSAO} em ${hostname()}`);
+/**
+ * A credencial da máquina, uma vez lida. Fica no módulo porque as funções que
+ * falam com o servidor precisam dela, e passá-la por parâmetro em todas só
+ * engrossaria as assinaturas.
+ */
+let cfg = null;
 
-const cfg = (await lerConfig()) ?? (await primeiraVez());
-if (!cfg) process.exit(1);
-
-// A lista de impressoras vai a cada início: impressora nova aparece na tela do
-// ZYNTRA sem ninguém reinstalar nada.
-await publicarImpressoras().catch((e) =>
-  registrar(`não consegui enviar a lista de impressoras: ${e.message}`),
-);
-
-registrar("online — aguardando trabalhos");
-
-while (!parando) {
-  try {
-    const trabalhos = await rpc("agente_reservar_trabalhos", {
-      p_token: cfg.token,
-      p_limite: 5,
-    });
-
-    if (!Array.isArray(trabalhos) || trabalhos.length === 0) {
-      await dormir(ESPERA_MS);
-      continue;
-    }
-
-    for (const t of trabalhos) {
-      try {
-        await imprimir(t.impressora, t.conteudo, t.copias ?? 1);
-        await concluir(t.id, true);
-        registrar(`ok   ${t.tipo}  ${t.impressora}`);
-      } catch (erro) {
-        const msg = erro instanceof Error ? erro.message : String(erro);
-        await concluir(t.id, false, msg);
-        registrar(`ERRO ${t.tipo}  ${t.impressora}: ${msg}`);
-      }
-    }
-  } catch (erro) {
-    // Falha de rede não pode derrubar o agente: o galpão continua, e ele volta
-    // a tentar no próximo ciclo.
-    registrar(`ciclo falhou, tentando de novo: ${erro.message}`);
-    await dormir(Math.max(ESPERA_MS, 5000));
+/**
+ * Tudo dentro de uma função de propósito: `await` no topo do arquivo não
+ * sobrevive ao empacotamento em executável, que exige CommonJS.
+ */
+async function principal() {
+  // `--versao` existe para o instalador conferir que o executável abre, sem
+  // precisar de credencial nem de rede.
+  if (process.argv.includes("--versao")) {
+    console.log(VERSAO);
+    return 0;
   }
+
+  registrar(`${VERSAO} em ${hostname()}`);
+
+  cfg = (await lerConfig()) ?? (await primeiraVez());
+  if (!cfg) return 1;
+
+  // A lista de impressoras vai a cada início: impressora nova aparece na tela
+  // do ZYNTRA sem ninguém reinstalar nada.
+  await publicarImpressoras().catch((e) =>
+    registrar(`não consegui enviar a lista de impressoras: ${e.message}`),
+  );
+
+  registrar("online — aguardando trabalhos");
+
+  while (!parando) {
+    try {
+      const trabalhos = await rpc("agente_reservar_trabalhos", {
+        p_token: cfg.token,
+        p_limite: 5,
+      });
+
+      if (!Array.isArray(trabalhos) || trabalhos.length === 0) {
+        await dormir(ESPERA_MS);
+        continue;
+      }
+
+      for (const t of trabalhos) {
+        try {
+          await imprimir(t.impressora, t.conteudo, t.copias ?? 1);
+          await concluir(t.id, true);
+          registrar(`ok   ${t.tipo}  ${t.impressora}`);
+        } catch (erro) {
+          const msg = erro instanceof Error ? erro.message : String(erro);
+          await concluir(t.id, false, msg);
+          registrar(`ERRO ${t.tipo}  ${t.impressora}: ${msg}`);
+        }
+      }
+    } catch (erro) {
+      // Falha de rede não pode derrubar o agente: o galpão continua, e ele
+      // volta a tentar no próximo ciclo.
+      registrar(`ciclo falhou, tentando de novo: ${erro.message}`);
+      await dormir(Math.max(ESPERA_MS, 5000));
+    }
+  }
+
+  return 0;
 }
 
 // ------------------------------------------------------------ primeira vez
@@ -354,3 +376,11 @@ function registrar(msg) {
   const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
   console.log(`[${agora}] ${msg}`);
 }
+
+principal().then(
+  (codigo) => process.exit(codigo ?? 0),
+  (erro) => {
+    registrar(`o agente parou: ${erro?.message ?? erro}`);
+    process.exit(1);
+  },
+);

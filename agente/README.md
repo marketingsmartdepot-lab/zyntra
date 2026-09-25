@@ -5,13 +5,30 @@ Roda na máquina da bancada, ligada por USB na Zebra.
 Existe porque **navegador não fala com impressora USB** e a ZD220 não tem
 rede — não há como imprimir a partir do servidor.
 
-## Instalar
+## Instalar numa máquina do galpão
 
-Precisa de Node.js 20 ou mais novo.
+Copie para o computador da bancada os dois arquivos — `ZyntraAgente.exe` e
+`instalar.ps1` — e rode o instalador (botão direito, **Executar com o
+PowerShell**). Não precisa de Node instalado na bancada: o executável já traz
+tudo dentro.
 
-```
-npm start
-```
+O instalador copia o agente, faz o login e registra para abrir sozinho toda vez
+que alguém entrar no Windows.
+
+### De onde vem o .exe
+
+Ele é compilado no Windows, pelo workflow **Agente de impressão** na aba
+Actions do repositório — binário de Windows montado no Mac é binário que
+ninguém abriu antes de entregar. O workflow roda sozinho a cada mudança na
+pasta `agente/`, confere que o executável abre e publica o arquivo em
+*Artifacts*, no fim da página da execução.
+
+### Durante o desenvolvimento
+
+Com Node 20 ou mais novo, `npm start` roda o mesmo agente pelo código-fonte, e
+`npm run empacotar` gera o executável do sistema em que você está.
+
+## O login
 
 Na primeira vez ele pede **o e-mail e a senha do ZYNTRA** — os mesmos que a
 pessoa usa no sistema. Com isso ele registra a máquina e recebe uma credencial

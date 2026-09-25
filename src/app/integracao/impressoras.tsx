@@ -260,21 +260,25 @@ function ComoInstalar({ compacto }: { compacto: boolean }) {
 
       <ol className="m-0 mt-2 max-w-[84ch] list-decimal pl-5 text-[13px] leading-relaxed text-suave">
         <li className="mb-1">
-          Copie a pasta <code className="font-mono">agente</code> para o
-          computador da bancada e rode{" "}
-          <code className="rounded bg-fundo px-[5px] py-[2px] font-mono text-[12px]">
-            npm start
-          </code>
-          .
+          Copie para o computador da bancada a pasta com{" "}
+          <code className="font-mono">ZyntraAgente.exe</code> e{" "}
+          <code className="font-mono">instalar.ps1</code>.
         </li>
         <li className="mb-1">
-          Na primeira vez ele pede <b>o e-mail e a senha do ZYNTRA</b> — os
-          mesmos que a pessoa usa no sistema. A senha não fica guardada na
-          máquina: ela vira uma credencial daquele computador.
+          Clique com o botão direito em{" "}
+          <code className="font-mono">instalar.ps1</code> e escolha{" "}
+          <b className="font-semibold">Executar com o PowerShell</b>.
+        </li>
+        <li className="mb-1">
+          Ele pede <b className="font-semibold">o e-mail e a senha do ZYNTRA</b>{" "}
+          — os mesmos que a pessoa usa no sistema. A senha não fica guardada na
+          máquina: ela vira uma credencial daquele computador, que você pode
+          cancelar aqui a qualquer momento.
         </li>
         <li>
-          Pronto. A máquina e as impressoras dela aparecem nesta tela, e é aqui
-          que você escolhe a térmica de cada bancada.
+          Pronto. A máquina e as impressoras dela aparecem nesta tela, e o
+          agente passa a abrir sozinho toda vez que alguém entrar no Windows.
+          Aqui você só escolhe qual impressora é a térmica de cada bancada.
         </li>
       </ol>
 

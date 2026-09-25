@@ -1,12 +1,19 @@
 {
   "name": "zyntra-agente",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Agente de impressao do ZYNTRA. Roda na maquina da bancada, ligada por USB na Zebra ZD220.",
-  "engines": { "node": ">=20" },
+  "description": "Agente de impressao do ZYNTRA. Roda na maquina da bancada, ligada por USB na Zebra.",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node agente.mjs",
-    "impressoras": "node -e \"import('node:child_process').then(c=>c.execSync(process.platform==='win32'?'wmic printer get name':'lpstat -p',{stdio:'inherit'}))\""
+    "impressoras": "node -e \"import('node:child_process').then(c=>c.execSync(process.platform==='win32'?'powershell -NoProfile -Command \\\"Get-Printer | Select-Object -ExpandProperty Name\\\"':'lpstat -e',{stdio:'inherit'}))\"",
+    "empacotar": "node empacotar.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2",
+    "postject": "1.0.0-alpha.6"
   }
 }

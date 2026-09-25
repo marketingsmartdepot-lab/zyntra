@@ -1,0 +1,55 @@
+# Compila o agente de impressão num executável do Windows.
+#
+# Roda no Windows de propósito: binário de Windows montado num Mac é binário
+# que ninguém abriu antes de entregar. Aqui ele é gerado e aberto na mesma
+# máquina, e o passo de conferência falha o build se o executável não rodar.
+name: Agente de impressão
+
+on:
+  push:
+    branches: [main]
+    paths: ["agente/**", ".github/workflows/agente.yml"]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: agente
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # O Node oficial traz o empacotador habilitado; algumas distribuições o
+      # desligam na compilação, e aí o passo de empacotar falha.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar dependências
+        run: npm ci --no-audit --no-fund
+
+      - name: Empacotar
+        run: npm run empacotar
+
+      - name: Conferir que o executável abre
+        run: |
+          $saida = & .\dist\ZyntraAgente.exe --versao
+          Write-Host "versão: $saida"
+          if (-not $saida) { throw "o executável não respondeu --versao" }
+
+      - name: Conferir que enxerga as impressoras
+        run: |
+          # Não é teste de impressão — é conferir que a descoberta funciona
+          # neste Windows, que é o passo que substituiu o nome digitado à mão.
+          $n = (Get-Printer | Measure-Object).Count
+          Write-Host "$n impressora(s) visíveis para o agente"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZyntraAgente-windows
+          path: |
+            agente/dist/ZyntraAgente.exe
+            agente/instalar.ps1
+          if-no-files-found: error
