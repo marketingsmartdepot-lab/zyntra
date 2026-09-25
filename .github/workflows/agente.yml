@@ -76,7 +76,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ZyntraAgente-windows
-          path: |
-            agente/dist/ZyntraAgente.exe
-            agente/instalar.ps1
+          path: agente/dist/ZyntraAgente.exe
           if-no-files-found: error

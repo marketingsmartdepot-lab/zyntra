@@ -7,28 +7,32 @@ rede — não há como imprimir a partir do servidor.
 
 ## Instalar numa máquina do galpão
 
-Baixe o instalador na aba **Actions** do repositório, no workflow *Agente de
-impressão*: abra a última execução verde e pegue `ZyntraAgente-windows`, no fim
-da página. Descompacte no computador da bancada e rode `instalar.ps1` (botão
-direito, **Executar com o PowerShell**).
+No computador da bancada, abra o ZYNTRA em **Integração → Estações e
+impressoras** e clique em **Baixar o app**. Abra o arquivo baixado. Não há
+instalador separado: o próprio agente se copia para a pasta do usuário e se
+agenda para abrir no logon.
 
-Não precisa de Node instalado na bancada: o executável já traz tudo dentro.
+Não precisa de Node instalado na bancada — o executável já traz tudo dentro.
 
-O instalador copia o agente, faz o login e registra para abrir sozinho toda vez
-que alguém entrar no Windows.
+O Windows avisa que não conhece o programa, porque ele não tem assinatura paga:
+**Mais informações → Executar assim mesmo**.
 
 ### De onde vem o .exe
 
-Ele é compilado no Windows, pelo workflow **Agente de impressão** na aba
-Actions do repositório — binário de Windows montado no Mac é binário que
-ninguém abriu antes de entregar. O workflow roda sozinho a cada mudança na
-pasta `agente/`, confere que o executável abre e publica o arquivo em
-*Artifacts*, no fim da página da execução.
+Do workflow **Agente de impressão**, na aba Actions do repositório — binário de
+Windows montado no Mac é binário que ninguém abriu antes de entregar. Ele
+compila, comprime (83 MB de Node viram 26, que é o que cabe no limite de
+arquivo do plano), confere que o executável comprimido ainda abre, e publica em
+*Artifacts*.
+
+Quem pega esse arquivo e publica no ZYNTRA é um administrador, pelo campo
+**Publicar nova versão** na mesma tela.
 
 ### Durante o desenvolvimento
 
 Com Node 20 ou mais novo, `npm start` roda o mesmo agente pelo código-fonte, e
-`npm run empacotar` gera o executável do sistema em que você está.
+`npm run empacotar` gera o executável do sistema em que você está. Rodando pelo
+código-fonte ele não se auto-instala.
 
 ## O login
 

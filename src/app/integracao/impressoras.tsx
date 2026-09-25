@@ -5,6 +5,7 @@ import {
   criarBancada,
   revogarMaquina,
 } from "./impressoras-acoes";
+import { AppDaBancada } from "./app-agente";
 
 type Maquina = {
   id: string;
@@ -45,18 +46,30 @@ type Bancada = { id: string; nome: string };
 export async function Impressoras({ falha }: { falha?: string }) {
   const supabase = await criarClienteServidor();
 
-  const [{ data: maq }, { data: imp }, { data: est }] = await Promise.all([
-    supabase.from("maquinas_do_agente").select("*").order("nome_maquina"),
-    supabase
-      .from("impressoras")
-      .select("id, dispositivo_id, nome_no_sistema, nome, linguagem, ativa, copias, estacao_id, vista_em")
-      .order("nome_no_sistema"),
-    supabase.from("estacoes").select("id, nome").order("nome"),
-  ]);
+  const [{ data: maq }, { data: imp }, { data: est }, { data: admin }, publicado] =
+    await Promise.all([
+      supabase.from("maquinas_do_agente").select("*").order("nome_maquina"),
+      supabase
+        .from("impressoras")
+        .select("id, dispositivo_id, nome_no_sistema, nome, linguagem, ativa, copias, estacao_id, vista_em")
+        .order("nome_no_sistema"),
+      supabase.from("estacoes").select("id, nome").order("nome"),
+      supabase.rpc("e_admin"),
+      supabase.storage.from("app").list("", { limit: 100 }),
+    ]);
 
   const maquinas = (maq ?? []) as Maquina[];
   const impressoras = (imp ?? []) as Impressora[];
   const bancadas = (est ?? []) as Bancada[];
+
+  const instalador = (publicado.data ?? []).find((o) => o.name === "ZyntraAgente.exe");
+  const tamanho = (instalador?.metadata as { size?: number } | null)?.size ?? null;
+  // O endereço leva a data da publicação: sem isso a rede de distribuição
+  // continuaria entregando a versão velha depois de publicar uma nova.
+  const endereco = instalador
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/app/ZyntraAgente.exe` +
+      `?v=${encodeURIComponent(instalador.updated_at ?? "")}`
+    : null;
 
   return (
     <div className="flex flex-col gap-5 p-5">
@@ -238,6 +251,13 @@ export async function Impressoras({ falha }: { falha?: string }) {
         </form>
       </section>
 
+      <AppDaBancada
+        endereco={endereco}
+        publicadoEm={instalador?.updated_at ?? null}
+        tamanhoMb={tamanho ? Math.round(tamanho / 1048576) : null}
+        podePublicar={admin === true}
+      />
+
       <ComoInstalar compacto={maquinas.length > 0} />
     </div>
   );
@@ -264,43 +284,30 @@ function ComoInstalar({ compacto }: { compacto: boolean }) {
   return (
     <section className="rounded-[9px] border border-linha px-4 py-[14px]">
       <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em]">
-        Instalar o agente numa máquina
+        Instalar numa máquina do galpão
       </h3>
 
       <ol className="m-0 mt-2 max-w-[84ch] list-decimal pl-5 text-[13px] leading-relaxed text-suave">
         <li className="mb-1">
-          Baixe o instalador:{" "}
-          <a
-            href="https://github.com/marketingsmartdepot-lab/zyntra/actions/workflows/agente.yml"
-            target="_blank"
-            rel="noreferrer"
-            className="font-semibold underline"
-          >
-            abra a última execução verde
-          </a>{" "}
-          e, no fim da página, pegue{" "}
-          <code className="font-mono">ZyntraAgente-windows</code>.
+          No computador da bancada, abra o ZYNTRA e clique em{" "}
+          <b className="font-semibold">Baixar o app</b>, aqui em cima.
         </li>
         <li className="mb-1">
-          Descompacte no computador da bancada. Vêm dois arquivos:{" "}
-          <code className="font-mono">ZyntraAgente.exe</code> e{" "}
-          <code className="font-mono">instalar.ps1</code>.
-        </li>
-        <li className="mb-1">
-          Clique com o botão direito em{" "}
-          <code className="font-mono">instalar.ps1</code> e escolha{" "}
-          <b className="font-semibold">Executar com o PowerShell</b>.
+          Abra o arquivo baixado. Se o Windows avisar que não conhece o
+          programa, clique em <b className="font-semibold">Mais informações</b>{" "}
+          e depois em <b className="font-semibold">Executar assim mesmo</b> — é o
+          aviso padrão para programa sem assinatura paga.
         </li>
         <li className="mb-1">
           Ele pede <b className="font-semibold">o e-mail e a senha do ZYNTRA</b>{" "}
           — os mesmos que a pessoa usa no sistema. A senha não fica guardada na
-          máquina: ela vira uma credencial daquele computador, que você pode
+          máquina: vira uma credencial daquele computador, que você pode
           cancelar aqui a qualquer momento.
         </li>
         <li>
-          Pronto. A máquina e as impressoras dela aparecem nesta tela, e o
-          agente passa a abrir sozinho toda vez que alguém entrar no Windows.
-          Aqui você só escolhe qual impressora é a térmica de cada bancada.
+          Pronto. Ele se instala sozinho e passa a abrir junto com o Windows. A
+          máquina e as impressoras dela aparecem nesta tela, e é aqui que você
+          diz o que cada impressora imprime.
         </li>
       </ol>
 
@@ -309,7 +316,7 @@ function ComoInstalar({ compacto }: { compacto: boolean }) {
           O agente existe porque navegador não fala com impressora USB e a ZD220
           não tem rede — não há como imprimir a partir do servidor. Ele nunca
           fala com o Mercado Livre nem com o Bling: quem busca a etiqueta é o
-          servidor, que tem as credenciais. O agente recebe texto pronto e
+          servidor, que tem as credenciais. O agente recebe o documento pronto e
           entrega à impressora.
         </p>
       )}
