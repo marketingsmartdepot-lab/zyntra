@@ -8,6 +8,7 @@ import { Impressoras } from "./impressoras";
 import { Operadores } from "./operadores";
 import { Estoque } from "./estoque";
 import { Cadastros } from "./cadastros";
+import { Equipe } from "./equipe";
 
 export const metadata = { title: "Integração — ZYNTRA" };
 
@@ -17,6 +18,7 @@ const ABAS = [
   { chave: "operadores", rotulo: "Operadores" },
   { chave: "estoque", rotulo: "Estoque" },
   { chave: "cadastros", rotulo: "Cadastros" },
+  { chave: "equipe", rotulo: "Equipe" },
 ] as const;
 
 type Aba = (typeof ABAS)[number]["chave"];
@@ -63,6 +65,13 @@ export default async function PaginaIntegracao({
   const linhas = (saude ?? []) as { conectada: boolean; expirada: boolean }[];
   const conectadas = linhas.filter((l) => l.conectada).length;
   const expiradas = linhas.filter((l) => l.expirada).length;
+
+  // Quem hoje consegue entrar. É o número que importa nesta aba: perfil
+  // inativo existe mas não enxerga nada.
+  const { count: comAcesso } = await supabase
+    .from("perfis")
+    .select("id", { count: "exact", head: true })
+    .eq("ativo", true);
 
   const { count: empresas } = await supabase
     .from("empresas")
@@ -112,6 +121,13 @@ export default async function PaginaIntegracao({
             ativa: aba === "cadastros",
             separadaAntes: true,
           },
+          {
+            chave: "equipe",
+            href: "/integracao?aba=equipe",
+            rotulo: "Equipe",
+            contagem: comAcesso ?? 0,
+            ativa: aba === "equipe",
+          },
         ]}
         direita={
           conectadas === 0 ? (
@@ -140,6 +156,8 @@ export default async function PaginaIntegracao({
               "A baixa acontece quando a NF-e é autorizada, não quando a caixa sai — senão a peça segue vendável por horas."}
             {aba === "cadastros" &&
               "O que o sistema lê e ninguém tinha onde criar. Muda raramente, então fica tudo junto."}
+            {aba === "equipe" &&
+              "Quem tem login no sistema. Só quem está autorizado aqui enxerga alguma coisa — o resto vê uma tela vazia."}
           </>
         }
       />
@@ -150,6 +168,7 @@ export default async function PaginaIntegracao({
         {aba === "operadores" && <Operadores falha={falha} />}
         {aba === "estoque" && <Estoque falha={falha} />}
         {aba === "cadastros" && <Cadastros falha={falha} />}
+        {aba === "equipe" && <Equipe falha={falha} />}
       </div>
     </Casca>
   );

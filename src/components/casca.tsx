@@ -23,6 +23,13 @@ export async function Casca({
   compacta?: boolean;
   children: React.ReactNode;
 }) {
+  // A porta. Perfil inativo passa pelo login — a senha está certa — mas não é
+  // da equipe. Sem isto ele veria o ZYNTRA inteiro com todas as listas vazias
+  // e acharia que o sistema quebrou, quando na verdade nunca foi liberado.
+  const supabaseGuarda = await criarClienteServidor();
+  const { data: daEquipe } = await supabaseGuarda.rpc("e_da_equipe");
+  if (daEquipe === false) return <SemAcesso email={email} />;
+
   const escolha = (await cookies()).get("zyntra_lateral")?.value;
   const recolhida = escolha
     ? escolha === "recolhida"
@@ -67,3 +74,38 @@ export async function Casca({
   );
 }
 
+
+/**
+ * A tela de quem tem login mas não foi autorizado.
+ *
+ * Diz o que aconteceu e o que fazer, sem insinuar erro de senha — a senha
+ * está certa. E não mostra nada do sistema: nem contagem, nem nome de conta,
+ * nem a lateral com as frentes.
+ */
+function SemAcesso({ email }: { email: string }) {
+  return (
+    <div className="flex min-h-dvh flex-col bg-fundo">
+      <main className="flex flex-1 items-center justify-center px-6 py-16">
+        <div className="max-w-[54ch] text-center">
+          <h1 className="m-0 text-[22px] font-bold tracking-[-0.02em]">
+            Esta conta ainda não foi liberada
+          </h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-suave">
+            Seu login funcionou, mas <b className="font-semibold text-tinta">{email}</b>{" "}
+            não está na lista de pessoas autorizadas a usar o ZYNTRA. Peça a um
+            administrador para liberar seu e-mail em Integração › Equipe.
+          </p>
+          <form action="/auth/sair" method="post" className="mt-7">
+            <button
+              type="submit"
+              className="rounded-lg border border-linha bg-superficie px-4 py-[9px] text-[13px] font-semibold"
+            >
+              Sair
+            </button>
+          </form>
+        </div>
+      </main>
+      <Rodape className="shrink-0 border-t border-grafite-linha bg-grafite px-5 py-[10px]" />
+    </div>
+  );
+}
