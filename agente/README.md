@@ -1,75 +1,51 @@
 # Agente de impressão do ZYNTRA
 
-Roda na máquina da bancada. Existe porque **navegador não fala com impressora
-USB** e a **Zebra ZD220 não tem rede** — não há como imprimir a partir do
-servidor.
+Roda na máquina da bancada, ligada por USB na Zebra.
 
-Uma instalação por bancada. Cada uma tem o seu token, e a etiqueta sai na
-impressora daquela bancada.
-
-## O que ele faz
-
-1. Bate ponto — é isso que faz a tela dizer **online**. Sem batida recente, o
-   ZYNTRA recusa a impressão em vez de fingir que mandou.
-2. Reserva os próximos trabalhos **daquela** impressora.
-3. Manda o ZPL cru para o spooler do sistema.
-4. Diz se o comando foi aceito.
-
-**O que ele não faz:** falar com o Mercado Livre. Quem busca a etiqueta é o
-servidor, que tem o token do ML. O agente recebe texto pronto — assim o
-segredo nunca chega numa máquina do galpão.
-
-E **"impressa" significa comando aceito pela impressora**. A prova de que saiu
-papel continua sendo o operador bipar a etiqueta.
+Existe porque **navegador não fala com impressora USB** e a ZD220 não tem
+rede — não há como imprimir a partir do servidor.
 
 ## Instalar
 
-Precisa de Node 20 ou mais novo. Não tem dependências.
-
-```
-cp .env.exemplo .env
-```
-
-Descubra o nome da impressora:
-
-```
-npm run impressoras
-```
-
-Preencha o `.env`:
-
-- **TOKEN** — gerado no ZYNTRA, em *Integração → Estações e impressoras*.
-  Aparece uma vez só.
-- **IMPRESSORA** — no macOS e Linux, o nome que apareceu no comando acima. No
-  Windows, o nome do **compartilhamento** da impressora.
-
-Rode:
+Precisa de Node.js 20 ou mais novo.
 
 ```
 npm start
 ```
 
-## Windows
+Na primeira vez ele pede **o e-mail e a senha do ZYNTRA** — os mesmos que a
+pessoa usa no sistema. Com isso ele registra a máquina e recebe uma credencial
+**do computador**, que é o que fica guardado em `~/.zyntra/agente.json`.
 
-O spooler do Windows não tem modo *raw* por linha de comando, então o agente
-copia o arquivo direto para a impressora compartilhada. Para isso ela precisa
-estar **compartilhada**:
+A senha não é gravada em lugar nenhum. Se a máquina for trocada, roubada ou
+aposentada, remove-se a máquina no ZYNTRA e a credencial dela morre — ninguém
+precisa mudar de senha.
 
-*Configurações → Impressoras → ZD220 → Propriedades → Compartilhamento →
-Compartilhar esta impressora*. O nome que você der ali é o que vai no `.env`.
+## O que acontece depois
 
-## Deixar rodando sozinho
+O agente manda a lista de impressoras que o sistema operacional enxerga. Elas
+aparecem em **Integração → Estações e impressoras**, e é lá que se diz qual é a
+térmica de cada bancada.
 
-- **Windows:** Agendador de Tarefas, gatilho *ao fazer logon*, ação
-  `node C:\zyntra\agente\agente.mjs`, iniciar em `C:\zyntra\agente`.
-- **macOS:** um `launchd` plist em `~/Library/LaunchAgents` com `RunAtLoad` e
-  `KeepAlive`.
-- **Linux:** uma unit do systemd com `Restart=always`.
+Ninguém digita nome de impressora. Nome digitado errado não imprime e falha
+calado — foi o que essa mudança resolveu.
 
-## Quando algo não imprime
+Se você instalar uma impressora nova depois, reinicie o agente: a lista é
+enviada ao iniciar.
 
-A tela do ZYNTRA mostra o agente **offline** se ele parar de bater ponto por
-mais de dois minutos. Nessa situação a impressão é recusada, com o motivo, em
-vez de sumir.
+## Como ele imprime
 
-Erro de impressão fica gravado no trabalho e aparece na fila — não se perde.
+O ZPL vai cru para o spooler, pelo nome da impressora.
+
+- **Windows** — chama o `winspool.drv` pelo PowerShell que já vem no sistema.
+  Não é preciso compartilhar a impressora na rede.
+- **macOS e Linux** — `lp -o raw`.
+
+## O que ele não faz
+
+Não fala com o Mercado Livre nem com o Bling. Quem busca a etiqueta é o
+servidor, que tem as credenciais; o agente recebe texto pronto. Assim nenhum
+segredo de canal chega à máquina do galpão.
+
+E "impressa" aqui significa **comando aceito pela impressora**. A prova de que
+saiu papel continua sendo o operador bipar a etiqueta impressa.

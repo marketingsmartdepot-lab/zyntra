@@ -2,33 +2,43 @@
 /**
  * Agente de impressão do ZYNTRA.
  *
- * Roda na máquina da bancada, ligada por USB na Zebra ZD220. Existe porque
- * navegador não fala com impressora USB e a ZD220 não tem rede — não há como
- * imprimir a partir do servidor.
+ * Roda na máquina da bancada, ligada por USB na Zebra. Existe porque navegador
+ * não fala com impressora USB e a ZD220 não tem rede — não há como imprimir a
+ * partir do servidor.
  *
- * O que ele faz, em ciclo:
- *   1. bate ponto (é isso que faz a tela dizer "online")
- *   2. reserva os próximos trabalhos daquela impressora
- *   3. manda o ZPL para a impressora pelo spooler do sistema
- *   4. diz se o comando foi aceito
+ * Na primeira vez ele pede o e-mail e a senha de quem usa o ZYNTRA. Com isso
+ * registra a máquina e recebe uma credencial do DISPOSITIVO, que é o que fica
+ * guardado daqui em diante. A senha não é gravada em lugar nenhum: se esta
+ * máquina for trocada ou sumir, some a credencial dela e pronto — ninguém
+ * precisa trocar de senha.
  *
- * O que ele NÃO faz: falar com o Mercado Livre. Quem busca a etiqueta é o
- * servidor, que tem o token. O agente recebe texto pronto — assim o segredo
- * nunca chega na máquina do galpão.
+ * Ele também manda a lista de impressoras que o sistema operacional enxerga.
+ * Ninguém digita nome de impressora: nome digitado errado não imprime, e falha
+ * calado.
+ *
+ * O que ele NÃO faz: falar com o Mercado Livre ou com o Bling. Quem busca a
+ * etiqueta é o servidor, que tem as credenciais. O agente recebe texto pronto.
  *
  * E "impressa" aqui significa comando aceito pela impressora. A prova de que
  * saiu papel continua sendo o operador bipar a etiqueta impressa.
  */
 
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
-import { tmpdir, hostname } from "node:os";
-import { join } from "node:path";
+import { readFileSync, writeFileSync, mkdirSync, unlinkSync } from "node:fs";
+import { tmpdir, hostname, platform, homedir } from "node:os";
+import { join, dirname } from "node:path";
+import { createInterface } from "node:readline/promises";
+import { stdin, stdout } from "node:process";
 
-const VERSAO = "agente 1.0";
+const VERSAO = "agente 2.0";
+const ESPERA_MS = 3000;
 
-const cfg = carregarConfig();
-const ESPERA_MS = Number(cfg.INTERVALO_MS ?? 3000);
+/** A credencial da máquina mora aqui, fora da pasta do programa. */
+const ARQUIVO = process.env.ZYNTRA_CONFIG ?? join(homedir(), ".zyntra", "agente.json");
+
+const SERVIDOR = process.env.ZYNTRA_URL ?? "https://jhgpqllkeqqeuqxxzzup.supabase.co";
+const CHAVE =
+  process.env.ZYNTRA_CHAVE ?? "sb_publishable_Nu82pRN47pqk_Ed2jC8WbQ_BxPgTVty";
 
 let parando = false;
 for (const sinal of ["SIGINT", "SIGTERM"]) {
@@ -38,190 +48,302 @@ for (const sinal of ["SIGINT", "SIGTERM"]) {
   });
 }
 
-registrar(`${VERSAO} iniciado em ${hostname()}`);
-registrar(`impressora do sistema: ${cfg.IMPRESSORA}`);
-registrar(`servidor: ${cfg.SUPABASE_URL}`);
+registrar(`${VERSAO} em ${hostname()}`);
+
+const cfg = (await lerConfig()) ?? (await primeiraVez());
+if (!cfg) process.exit(1);
+
+// A lista de impressoras vai a cada início: impressora nova aparece na tela do
+// ZYNTRA sem ninguém reinstalar nada.
+await publicarImpressoras().catch((e) =>
+  registrar(`não consegui enviar a lista de impressoras: ${e.message}`),
+);
+
+registrar("online — aguardando trabalhos");
 
 while (!parando) {
   try {
-    const trabalhos = await reservarTrabalhos();
+    const trabalhos = await rpc("agente_reservar_trabalhos", {
+      p_token: cfg.token,
+      p_limite: 5,
+    });
 
-    if (trabalhos.length === 0) {
+    if (!Array.isArray(trabalhos) || trabalhos.length === 0) {
       await dormir(ESPERA_MS);
       continue;
     }
 
-    registrar(`${trabalhos.length} trabalho(s) para imprimir`);
-
     for (const t of trabalhos) {
       try {
-        await imprimir(t.conteudo, t.copias ?? 1);
+        await imprimir(t.impressora, t.conteudo, t.copias ?? 1);
         await concluir(t.id, true);
-        registrar(`ok  ${t.tipo}  ${t.id}`);
+        registrar(`ok   ${t.tipo}  ${t.impressora}`);
       } catch (erro) {
         const msg = erro instanceof Error ? erro.message : String(erro);
         await concluir(t.id, false, msg);
-        registrar(`ERRO ${t.tipo} ${t.id}: ${msg}`);
+        registrar(`ERRO ${t.tipo}  ${t.impressora}: ${msg}`);
       }
     }
   } catch (erro) {
-    // Falha de rede não pode derrubar o agente: o galpão continua, e ele
-    // volta a tentar no próximo ciclo.
-    const msg = erro instanceof Error ? erro.message : String(erro);
-    registrar(`ciclo falhou, tentando de novo: ${msg}`);
+    // Falha de rede não pode derrubar o agente: o galpão continua, e ele volta
+    // a tentar no próximo ciclo.
+    registrar(`ciclo falhou, tentando de novo: ${erro.message}`);
     await dormir(Math.max(ESPERA_MS, 5000));
   }
 }
 
-// ---------------------------------------------------------------- servidor
+// ------------------------------------------------------------ primeira vez
 
-async function rpc(funcao, corpo) {
-  const resposta = await fetch(`${cfg.SUPABASE_URL}/rest/v1/rpc/${funcao}`, {
+async function primeiraVez() {
+  const pergunta = createInterface({ input: stdin, output: stdout });
+
+  console.log(
+    "\n  Primeira vez nesta máquina.\n" +
+      "  Entre com o seu e-mail e senha do ZYNTRA — os mesmos do sistema.\n" +
+      "  A senha não fica guardada aqui.\n",
+  );
+
+  const email = (await pergunta.question("  E-mail: ")).trim();
+  const senha = await pergunta.question("  Senha: ");
+  pergunta.close();
+  console.log("");
+
+  let sessao;
+  try {
+    sessao = await entrar(email, senha);
+  } catch (erro) {
+    console.error(`\n  Não foi possível entrar: ${erro.message}\n`);
+    return null;
+  }
+
+  let registro;
+  try {
+    registro = await rpc(
+      "registrar_dispositivo",
+      { p_nome_maquina: hostname(), p_sistema: sistemaLegivel(), p_versao: VERSAO },
+      sessao.access_token,
+    );
+  } catch (erro) {
+    console.error(`\n  Não foi possível registrar esta máquina: ${erro.message}\n`);
+    return null;
+  }
+
+  const r = Array.isArray(registro) ? registro[0] : registro;
+  if (!r?.ok || !r?.token) {
+    console.error(`\n  O servidor recusou o registro: ${r?.motivo ?? "sem motivo"}\n`);
+    return null;
+  }
+
+  const novo = { token: r.token, maquina: hostname() };
+  mkdirSync(dirname(ARQUIVO), { recursive: true });
+  writeFileSync(ARQUIVO, JSON.stringify(novo, null, 2), { mode: 0o600 });
+
+  registrar(`máquina registrada como "${hostname()}"`);
+  console.log(
+    "\n  Pronto. Agora abra o ZYNTRA em Integração → Estações e impressoras\n" +
+      "  e diga qual destas impressoras é a térmica desta bancada.\n",
+  );
+
+  return novo;
+}
+
+async function lerConfig() {
+  try {
+    const c = JSON.parse(readFileSync(ARQUIVO, "utf8"));
+    return c?.token ? c : null;
+  } catch {
+    return null;
+  }
+}
+
+// ------------------------------------------------------------------ servidor
+
+async function entrar(email, senha) {
+  const r = await fetch(`${SERVIDOR}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: CHAVE, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: senha }),
+  });
+
+  const corpo = await r.json().catch(() => null);
+  if (!r.ok) {
+    throw new Error(corpo?.error_description ?? corpo?.msg ?? `resposta ${r.status}`);
+  }
+  return corpo;
+}
+
+async function rpc(funcao, corpo, comoUsuario) {
+  const r = await fetch(`${SERVIDOR}/rest/v1/rpc/${funcao}`, {
     method: "POST",
     headers: {
-      apikey: cfg.SUPABASE_KEY,
-      Authorization: `Bearer ${cfg.SUPABASE_KEY}`,
+      apikey: CHAVE,
+      Authorization: `Bearer ${comoUsuario ?? CHAVE}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(corpo),
   });
 
-  if (!resposta.ok) {
-    throw new Error(`${funcao} respondeu ${resposta.status}`);
-  }
-  return resposta.json();
-}
-
-async function reservarTrabalhos() {
-  const dados = await rpc("agente_reservar_trabalhos", {
-    p_token: cfg.TOKEN,
-    p_limite: 5,
-  });
-  return Array.isArray(dados) ? dados : [];
+  if (!r.ok) throw new Error(`${funcao} respondeu ${r.status}`);
+  return r.json();
 }
 
 async function concluir(id, ok, erro) {
   await rpc("agente_concluir_trabalho", {
-    p_token: cfg.TOKEN,
+    p_token: cfg.token,
     p_impressao_id: id,
     p_ok: ok,
     p_erro: erro ?? null,
   });
 }
 
-// -------------------------------------------------------------- impressora
+async function publicarImpressoras() {
+  const nomes = await listarImpressoras();
+  if (nomes.length === 0) {
+    registrar("nenhuma impressora encontrada nesta máquina");
+    return;
+  }
+
+  await rpc("publicar_impressoras", {
+    p_token: cfg.token,
+    p_impressoras: nomes.map((nome) => ({ nome })),
+  });
+
+  registrar(`${nomes.length} impressora(s) enviada(s): ${nomes.join(", ")}`);
+}
+
+// -------------------------------------------------------------- impressoras
+
+/** O que o sistema operacional conhece. É esta lista que aparece no ZYNTRA. */
+async function listarImpressoras() {
+  if (platform() === "win32") {
+    const saida = await executar("powershell", [
+      "-NoProfile",
+      "-Command",
+      "Get-Printer | Select-Object -ExpandProperty Name",
+    ]);
+    return saida.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  }
+
+  const saida = await executar("lpstat", ["-e"]);
+  return saida.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+}
 
 /**
- * O ZPL vai cru para o spooler. No macOS e Linux é `lp -o raw`; no Windows é
- * cópia binária para a impressora compartilhada, porque o spooler do Windows
- * não tem modo raw por linha de comando.
+ * O ZPL vai cru para o spooler, pelo NOME da impressora.
+ *
+ * No Windows isso é feito pelo `winspool.drv`, chamado pelo PowerShell que já
+ * vem no sistema. O jeito antigo — copiar o arquivo para o compartilhamento de
+ * rede — exigia a impressora compartilhada, um passo a mais que falha calado
+ * quando alguém esquece ou quando uma atualização apaga o compartilhamento.
  */
-async function imprimir(zpl, copias) {
-  if (!zpl || !zpl.trim()) {
-    throw new Error("trabalho sem conteúdo ZPL");
-  }
+async function imprimir(impressora, zpl, copias) {
+  if (!zpl || !zpl.trim()) throw new Error("trabalho sem conteúdo");
+  if (!impressora) throw new Error("trabalho sem impressora definida");
 
   for (let i = 0; i < copias; i++) {
-    if (process.platform === "win32") {
-      await imprimirWindows(zpl);
+    if (platform() === "win32") {
+      await imprimirWindows(impressora, zpl);
     } else {
-      await imprimirUnix(zpl);
+      await executarComEntrada("lp", ["-d", impressora, "-o", "raw"], zpl);
     }
   }
 }
 
-function imprimirUnix(zpl) {
-  return new Promise((resolve, reject) => {
-    const p = spawn("lp", ["-d", cfg.IMPRESSORA, "-o", "raw"], {
-      stdio: ["pipe", "ignore", "pipe"],
-    });
-
-    let erro = "";
-    p.stderr.on("data", (d) => (erro += d.toString()));
-    p.on("error", (e) => reject(new Error(`lp não pôde ser executado: ${e.message}`)));
-    p.on("close", (codigo) =>
-      codigo === 0
-        ? resolve()
-        : reject(new Error(erro.trim() || `lp terminou com código ${codigo}`)),
-    );
-
-    p.stdin.end(zpl);
-  });
-}
-
-function imprimirWindows(zpl) {
-  // O nome no Windows é o COMPARTILHAMENTO da impressora, não o nome amigável.
-  const alvo = cfg.IMPRESSORA.startsWith("\\\\")
-    ? cfg.IMPRESSORA
-    : `\\\\${hostname()}\\${cfg.IMPRESSORA}`;
+async function imprimirWindows(impressora, zpl) {
   const arquivo = join(tmpdir(), `zyntra-${Date.now()}.zpl`);
-
   writeFileSync(arquivo, zpl, "latin1");
 
+  // Add-Type declara a chamada ao spooler; RawPrinterHelper faz o
+  // StartDocPrinter/WritePrinter, que é como se manda ZPL sem driver no meio.
+  const script = `
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @"
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+public class ZyntraRaw {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+  public class DOCINFO { [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDataType; }
+  [DllImport("winspool.Drv", CharSet=CharSet.Unicode, SetLastError=true)]
+  public static extern bool OpenPrinter(string src, out IntPtr h, IntPtr pd);
+  [DllImport("winspool.Drv", SetLastError=true)] public static extern bool ClosePrinter(IntPtr h);
+  [DllImport("winspool.Drv", CharSet=CharSet.Unicode, SetLastError=true)]
+  public static extern bool StartDocPrinter(IntPtr h, int lvl, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFO di);
+  [DllImport("winspool.Drv", SetLastError=true)] public static extern bool EndDocPrinter(IntPtr h);
+  [DllImport("winspool.Drv", SetLastError=true)] public static extern bool StartPagePrinter(IntPtr h);
+  [DllImport("winspool.Drv", SetLastError=true)] public static extern bool EndPagePrinter(IntPtr h);
+  [DllImport("winspool.Drv", SetLastError=true)]
+  public static extern bool WritePrinter(IntPtr h, IntPtr buf, int n, out int escrito);
+  public static void Enviar(string impressora, string arquivo) {
+    byte[] dados = File.ReadAllBytes(arquivo);
+    IntPtr h; if (!OpenPrinter(impressora, out h, IntPtr.Zero))
+      throw new Exception("impressora nao encontrada: " + impressora);
+    try {
+      DOCINFO di = new DOCINFO(); di.pDocName = "ZYNTRA"; di.pDataType = "RAW";
+      if (!StartDocPrinter(h, 1, di)) throw new Exception("o spooler recusou o documento");
+      try {
+        if (!StartPagePrinter(h)) throw new Exception("o spooler recusou a pagina");
+        IntPtr buf = Marshal.AllocCoTaskMem(dados.Length);
+        try { Marshal.Copy(dados, 0, buf, dados.Length); int n;
+          if (!WritePrinter(h, buf, dados.Length, out n))
+            throw new Exception("falha ao escrever na impressora");
+        } finally { Marshal.FreeCoTaskMem(buf); }
+      } finally { EndPagePrinter(h); EndDocPrinter(h); }
+    } finally { ClosePrinter(h); }
+  }
+}
+"@
+[ZyntraRaw]::Enviar(${aspas(impressora)}, ${aspas(arquivo)})
+`;
+
+  try {
+    await executar("powershell", ["-NoProfile", "-Command", script]);
+  } finally {
+    try {
+      unlinkSync(arquivo);
+    } catch {
+      // Temporário que não some não é motivo para falhar o trabalho.
+    }
+  }
+}
+
+/** Aspas simples do PowerShell, com escape de aspas dentro do nome. */
+function aspas(s) {
+  return `'${String(s).replace(/'/g, "''")}'`;
+}
+
+// ------------------------------------------------------------------- apoio
+
+function executar(cmd, args) {
+  return executarComEntrada(cmd, args, null);
+}
+
+function executarComEntrada(cmd, args, entrada) {
   return new Promise((resolve, reject) => {
-    const p = spawn("cmd", ["/c", "copy", "/B", arquivo, alvo], {
-      stdio: ["ignore", "ignore", "pipe"],
+    const p = spawn(cmd, args, {
+      stdio: [entrada === null ? "ignore" : "pipe", "pipe", "pipe"],
     });
 
+    let saida = "";
     let erro = "";
+    p.stdout.on("data", (d) => (saida += d.toString()));
     p.stderr.on("data", (d) => (erro += d.toString()));
-    p.on("error", (e) => reject(new Error(`copy falhou: ${e.message}`)));
-    p.on("close", (codigo) => {
-      try {
-        unlinkSync(arquivo);
-      } catch {
-        // Arquivo temporário não removido não é motivo para falhar o trabalho.
-      }
+    p.on("error", (e) => reject(new Error(`${cmd} não pôde ser executado: ${e.message}`)));
+    p.on("close", (codigo) =>
       codigo === 0
-        ? resolve()
-        : reject(
-            new Error(
-              erro.trim() ||
-                `copy terminou com código ${codigo}. A impressora precisa estar compartilhada como "${cfg.IMPRESSORA}".`,
-            ),
-          );
-    });
+        ? resolve(saida)
+        : reject(new Error(erro.trim() || `${cmd} terminou com código ${codigo}`)),
+    );
+
+    if (entrada !== null) p.stdin.end(entrada);
   });
 }
 
-// ------------------------------------------------------------------ apoio
-
-function carregarConfig() {
-  const arquivo = process.env.ZYNTRA_ENV ?? join(process.cwd(), ".env");
-  const lido = {};
-
-  try {
-    for (const linha of readFileSync(arquivo, "utf8").split("\n")) {
-      const limpa = linha.trim();
-      if (!limpa || limpa.startsWith("#")) continue;
-      const i = limpa.indexOf("=");
-      if (i > 0) lido[limpa.slice(0, i).trim()] = limpa.slice(i + 1).trim();
-    }
-  } catch {
-    // Sem arquivo, vale o ambiente.
-  }
-
-  const cfg = { ...lido, ...semVazios(process.env) };
-  const faltando = ["SUPABASE_URL", "SUPABASE_KEY", "TOKEN", "IMPRESSORA"].filter(
-    (c) => !cfg[c],
-  );
-
-  if (faltando.length > 0) {
-    console.error(
-      `\nFalta configurar: ${faltando.join(", ")}\n` +
-        `Copie .env.exemplo para .env e preencha. O TOKEN é gerado no ZYNTRA,\n` +
-        `em Integração → Estações e impressoras, e aparece uma vez só.\n`,
-    );
-    process.exit(1);
-  }
-
-  return cfg;
-}
-
-function semVazios(obj) {
-  const saida = {};
-  for (const [k, v] of Object.entries(obj)) if (v) saida[k] = v;
-  return saida;
+function sistemaLegivel() {
+  const p = platform();
+  return p === "win32" ? "Windows" : p === "darwin" ? "macOS" : p;
 }
 
 function dormir(ms) {
@@ -229,8 +351,6 @@ function dormir(ms) {
 }
 
 function registrar(msg) {
-  const agora = new Date().toLocaleString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-  });
+  const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
   console.log(`[${agora}] ${msg}`);
 }

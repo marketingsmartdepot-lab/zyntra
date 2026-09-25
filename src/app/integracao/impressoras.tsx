@@ -1,268 +1,308 @@
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { criarEstacao, criarImpressora } from "./acoes";
-import { BotaoToken } from "./token";
+import { Botao } from "@/components/botao";
+import {
+  ajustarImpressora,
+  criarBancada,
+  revogarMaquina,
+} from "./impressoras-acoes";
+
+type Maquina = {
+  id: string;
+  nome_maquina: string;
+  sistema: string | null;
+  versao_agente: string | null;
+  ultimo_contato_em: string | null;
+  online: boolean;
+  registrada_por: string | null;
+  impressoras: number;
+};
 
 type Impressora = {
   id: string;
+  dispositivo_id: string | null;
+  nome_no_sistema: string | null;
   nome: string;
-  modelo: string | null;
-  conexao: string;
-  linguagem: string;
-  dpi: number | null;
-  largura_mm: number | null;
-  ativa: boolean;
-  agente_versao: string | null;
-  ultimo_contato_em: string | null;
-  estacao: string | null;
-  agente_online: boolean;
-  token_gerado: boolean;
-  na_fila: number;
-  ultimo_trabalho_em: string | null;
+  tipo: string;
+  copias: number;
+  estacao_id: string | null;
+  vista_em: string | null;
 };
 
-type Estacao = { id: string; nome: string };
+type Bancada = { id: string; nome: string };
 
-export async function Impressoras() {
+/**
+ * As máquinas do galpão e as impressoras que elas têm.
+ *
+ * Nada aqui é digitado: o agente entra com o login da própria pessoa, registra
+ * a máquina e manda a lista de impressoras que o sistema operacional enxerga.
+ * O que se faz nesta tela é dizer o papel de cada uma — qual é a térmica, de
+ * qual bancada, quantas cópias.
+ *
+ * Antes o admin digitava o nome da impressora à mão. Uma letra errada e a
+ * bancada não imprimia, sem nenhuma mensagem dizendo por quê.
+ */
+export async function Impressoras({ falha }: { falha?: string }) {
   const supabase = await criarClienteServidor();
 
-  const [{ data: impressoras }, { data: estacoes }] = await Promise.all([
-    supabase.from("impressoras_situacao").select("*").order("nome"),
+  const [{ data: maq }, { data: imp }, { data: est }] = await Promise.all([
+    supabase.from("maquinas_do_agente").select("*").order("nome_maquina"),
+    supabase
+      .from("impressoras")
+      .select("id, dispositivo_id, nome_no_sistema, nome, tipo, copias, estacao_id, vista_em")
+      .order("nome_no_sistema"),
     supabase.from("estacoes").select("id, nome").order("nome"),
   ]);
 
-  const lista = (impressoras ?? []) as Impressora[];
-  const bancadas = (estacoes ?? []) as Estacao[];
+  const maquinas = (maq ?? []) as Maquina[];
+  const impressoras = (imp ?? []) as Impressora[];
+  const bancadas = (est ?? []) as Bancada[];
 
   return (
     <div className="flex flex-col gap-5 p-5">
-      <section className="rounded-[9px] border border-linha bg-fundo px-4 py-[14px]">
-        <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em]">
-          Por que existe um agente
-        </h3>
-        <p className="mt-2 max-w-[86ch] text-[13px] leading-relaxed text-suave">
-          Navegador não fala com impressora USB. A <b>Zebra ZD220</b> é o modelo
-          de entrada e <b>só tem USB</b> — sem Ethernet, sem Wi-Fi. Isso quer
-          dizer que não existe imprimir a partir do servidor: um agente precisa
-          rodar na própria máquina onde a impressora está plugada.
-        </p>
-        <p className="mt-2 max-w-[86ch] text-[13px] leading-relaxed text-suave">
-          O ZYNTRA enfileira o trabalho e mostra se aquele agente está vivo.{" "}
-          <b>Sem batida recente, a tela recusa a impressão</b> em vez de fingir
-          que mandou — comando enviado nunca foi prova de papel.
-        </p>
-      </section>
+      {falha && <Aviso resultado={falha} />}
 
-      {lista.length === 0 ? (
-        <p className="rounded-[9px] border border-linha px-4 py-6 text-center text-[13.5px] text-suave">
-          Nenhuma impressora cadastrada. Cadastre a estação primeiro e depois a
-          impressora dela.
-        </p>
+      {maquinas.length === 0 ? (
+        <ComoComecar />
       ) : (
-        <div className="overflow-x-auto rounded-[9px] border border-linha">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                {[
-                  "Impressora",
-                  "Estação",
-                  "Conexão",
-                  "Agente",
-                  "Fila",
-                  "Token",
-                ].map((c) => (
-                  <th
-                    key={c}
-                    className="whitespace-nowrap border-b border-linha px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-suave"
+        maquinas.map((m) => {
+          const daMaquina = impressoras.filter((i) => i.dispositivo_id === m.id);
+
+          return (
+            <section key={m.id} className="rounded-[9px] border border-linha">
+              <header className="flex flex-wrap items-center gap-3 border-b border-linha px-4 py-3">
+                <span
+                  aria-hidden
+                  className={`h-[9px] w-[9px] rounded-full ${
+                    m.online ? "bg-[var(--color-ok)]" : "bg-linha"
+                  }`}
+                />
+                <h3 className="m-0 font-mono text-[14px] font-bold tracking-[-0.01em]">
+                  {m.nome_maquina}
+                </h3>
+                <span className="text-[12.5px] text-suave">
+                  {m.sistema ?? "sistema não informado"}
+                  {m.versao_agente && ` · ${m.versao_agente}`}
+                  {" · "}
+                  {m.online
+                    ? "online"
+                    : m.ultimo_contato_em
+                      ? `visto ${quando(m.ultimo_contato_em)}`
+                      : "nunca se conectou"}
+                </span>
+                <span className="flex-1" />
+                {m.registrada_por && (
+                  <span className="text-[12px] text-suave">
+                    instalada por {m.registrada_por}
+                  </span>
+                )}
+                <form action={revogarMaquina}>
+                  <input type="hidden" name="maquina" value={m.id} />
+                  <Botao
+                    trabalhando="Removendo…"
+                    className="rounded-lg border border-critico-linha px-3 py-[6px] text-[12.5px] font-semibold text-critico"
                   >
-                    {c}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lista.map((i) => (
-                <tr key={i.id}>
-                  <td className="border-b border-linha-suave px-4 py-3 align-top">
-                    <span className="text-[13px] font-semibold">{i.nome}</span>
-                    <span className="mt-[2px] block text-[11.5px] text-suave">
-                      {i.modelo ?? "modelo não informado"}
-                      {i.dpi && ` · ${i.dpi} dpi`}
-                      {i.largura_mm && ` · ${i.largura_mm} mm`}
-                      {" · "}
-                      {i.linguagem.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="border-b border-linha-suave px-4 py-3 align-top text-[12.5px]">
-                    {i.estacao ?? (
-                      <span className="text-suave">sem estação</span>
-                    )}
-                  </td>
-                  <td className="border-b border-linha-suave px-4 py-3 align-top">
-                    <Selo tom={i.conexao === "usb" ? "neutro" : "ok"}>
-                      {i.conexao === "usb" ? "USB" : "Rede"}
-                    </Selo>
-                    {i.conexao === "usb" && (
-                      <span className="mt-[3px] block text-[11px] text-suave">
-                        agente na máquina
-                      </span>
-                    )}
-                  </td>
-                  <td className="border-b border-linha-suave px-4 py-3 align-top">
-                    {i.agente_online ? (
-                      <Selo tom="ok">Online</Selo>
-                    ) : (
-                      <Selo tom="critico">Offline</Selo>
-                    )}
-                    <span className="mt-[3px] block text-[11px] text-suave">
-                      {i.ultimo_contato_em
-                        ? `último contato ${quando(i.ultimo_contato_em)}`
-                        : "nunca bateu ponto"}
-                      {i.agente_versao && ` · ${i.agente_versao}`}
-                    </span>
-                  </td>
-                  <td className="border-b border-linha-suave px-4 py-3 align-top font-mono text-[15px] font-semibold tabular-nums">
-                    {i.na_fila}
-                  </td>
-                  <td className="border-b border-linha-suave px-4 py-3 align-top">
-                    <BotaoToken impressoraId={i.id} jaTem={i.token_gerado} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    Remover máquina
+                  </Botao>
+                </form>
+              </header>
+
+              {daMaquina.length === 0 ? (
+                <p className="m-0 px-4 py-6 text-[13.5px] text-suave">
+                  Esta máquina ainda não enviou nenhuma impressora. O agente
+                  manda a lista ao iniciar — se a impressora foi instalada
+                  depois, reinicie o agente.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr>
+                        {["Impressora", "Serve para", "Bancada", "Cópias", ""].map(
+                          (c, i) => (
+                            <th
+                              key={i}
+                              className="border-b border-linha px-4 py-[10px] text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-suave"
+                            >
+                              {c}
+                            </th>
+                          ),
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {daMaquina.map((i) => (
+                        <tr key={i.id}>
+                          <td className="border-b border-linha-suave px-4 py-2 font-mono text-[13px]">
+                            {i.nome_no_sistema ?? i.nome}
+                          </td>
+                          <td colSpan={4} className="border-b border-linha-suave px-4 py-2">
+                            <form
+                              action={ajustarImpressora}
+                              className="flex flex-wrap items-center gap-2"
+                            >
+                              <input type="hidden" name="impressora" value={i.id} />
+
+                              <select
+                                name="tipo"
+                                defaultValue={i.tipo}
+                                aria-label="Serve para"
+                                className="rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
+                              >
+                                <option value="comum">Não usar para etiqueta</option>
+                                <option value="termica_zpl">
+                                  Etiqueta térmica (ZPL)
+                                </option>
+                              </select>
+
+                              <select
+                                name="estacao"
+                                defaultValue={i.estacao_id ?? ""}
+                                aria-label="Bancada"
+                                className="rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
+                              >
+                                <option value="">— sem bancada —</option>
+                                {bancadas.map((b) => (
+                                  <option key={b.id} value={b.id}>
+                                    {b.nome}
+                                  </option>
+                                ))}
+                              </select>
+
+                              <input
+                                type="number"
+                                name="copias"
+                                min={1}
+                                max={10}
+                                defaultValue={i.copias}
+                                aria-label="Número de cópias"
+                                className="w-[70px] rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
+                              />
+
+                              <Botao
+                                trabalhando="Salvando…"
+                                className="rounded-lg border border-linha px-3 py-[6px] text-[12.5px] font-semibold"
+                              >
+                                Salvar
+                              </Botao>
+                            </form>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          );
+        })
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Formulario
-          titulo="Cadastrar estação"
-          descricao="A bancada física. Uma estação pode ter uma impressora."
-          acao={criarEstacao}
-          botao="Cadastrar estação"
-        >
-          <Campo id="est-nome" rotulo="Nome" nome="nome" obrigatorio />
-          <Campo
-            id="est-local"
-            rotulo="Local"
-            nome="local"
-            dica="Ex.: bancada de conferência"
-          />
-        </Formulario>
+      {/* --------------------------------------------------- as bancadas */}
+      <section className="max-w-[560px] rounded-[9px] border border-linha px-4 py-[14px]">
+        <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em]">Bancadas</h3>
+        <p className="mb-3 mt-1 text-[12.5px] leading-relaxed text-suave">
+          A bancada existe para a etiqueta sair do lado de quem bipou. Cada
+          computador do galpão diz uma vez qual bancada ele é, em{" "}
+          <b className="font-semibold">Qual bancada é esta</b>.
+        </p>
 
-        <Formulario
-          titulo="Cadastrar impressora"
-          descricao="Os valores já vêm preenchidos para a ZD220."
-          acao={criarImpressora}
-          botao="Cadastrar impressora"
-        >
-          <Campo id="imp-nome" rotulo="Nome" nome="nome" obrigatorio />
-          <label
-            htmlFor="imp-estacao"
-            className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
-          >
-            Estação
-          </label>
-          {/*
-            Obrigatória, e sem opção vazia: a impressão é roteada PELA bancada.
-            Impressora sem bancada aceita token e aceita agente, mas nunca
-            recebe trabalho — bancada montada, agente rodando, nada saindo.
-          */}
-          <select
-            id="imp-estacao"
-            name="estacao"
+        {bancadas.length > 0 && (
+          <p className="mb-3 text-[13px]">
+            {bancadas.map((b) => b.nome).join(" · ")}
+          </p>
+        )}
+
+        <form action={criarBancada} className="flex flex-wrap items-end gap-2">
+          <input
+            name="nome"
             required
-            defaultValue=""
-            disabled={bancadas.length === 0}
-            className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px] disabled:text-suave"
-          >
-            <option value="" disabled>
-              {bancadas.length === 0
-                ? "cadastre uma estação primeiro"
-                : "escolha a bancada"}
-            </option>
-            {bancadas.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.nome}
-              </option>
-            ))}
-          </select>
-          <Campo
-            id="imp-modelo"
-            rotulo="Modelo"
-            nome="modelo"
-            valor="Zebra ZD220"
+            placeholder="nome da bancada"
+            aria-label="Nome da bancada"
+            className="w-[240px] rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
           />
-          <div className="grid grid-cols-3 gap-2">
-            <Campo id="imp-dpi" rotulo="DPI" nome="dpi" valor="203" />
-            <Campo
-              id="imp-largura"
-              rotulo="Largura mm"
-              nome="largura"
-              valor="104"
-            />
-            <Campo
-              id="imp-ling"
-              rotulo="Linguagem"
-              nome="linguagem"
-              valor="zpl"
-            />
-          </div>
-          <input type="hidden" name="conexao" value="usb" />
-        </Formulario>
-      </div>
-
-      <section className="rounded-[9px] border border-linha px-4 py-[14px]">
-        <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em]">
-          Instalar o agente na máquina da bancada
-        </h3>
-        <p className="mt-2 max-w-[86ch] text-[13px] leading-relaxed text-suave">
-          O navegador não fala com impressora USB, e a ZD220 não tem rede — por
-          isso existe um programa que roda <b>na máquina da bancada</b> e busca
-          a fila. Enquanto ele não estiver rodando ali, a impressora aparece
-          offline e a conferência recusa a impressão.
-        </p>
-
-        <ol className="m-0 mt-3 max-w-[86ch] list-decimal pl-5 text-[13px] leading-relaxed text-suave">
-          <li className="mb-2">
-            Instale o <b>Node.js 20 ou mais novo</b> na máquina da bancada, e
-            copie a pasta <code className="font-mono">agente</code> do projeto
-            para ela.
-          </li>
-          <li className="mb-2">
-            Descubra o nome da impressora no sistema:{" "}
-            <code className="rounded bg-fundo px-[5px] py-[2px] font-mono text-[12px]">
-              npm run impressoras
-            </code>
-            . No Windows, o que vale é o nome do{" "}
-            <b>compartilhamento</b>, não o nome amigável.
-          </li>
-          <li className="mb-2">
-            Copie <code className="font-mono">.env.exemplo</code> para{" "}
-            <code className="font-mono">.env</code> e preencha{" "}
-            <code className="font-mono">TOKEN</code> (o botão acima gera, e ele
-            aparece <b>uma vez só</b>) e{" "}
-            <code className="font-mono">IMPRESSORA</code>.
-          </li>
-          <li>
-            Rode{" "}
-            <code className="rounded bg-fundo px-[5px] py-[2px] font-mono text-[12px]">
-              npm start
-            </code>
-            . Em segundos a impressora fica online aqui. Deixe a janela aberta —
-            é ela que mantém a fila andando.
-          </li>
-        </ol>
-
-        <p className="mt-3 max-w-[86ch] text-[12.5px] leading-relaxed text-suave">
-          O agente nunca fala com o Mercado Livre: quem busca a etiqueta é o
-          servidor, que tem o token do canal. O agente recebe texto pronto e
-          manda para a impressora — assim nenhum segredo chega à máquina do
-          galpão. E &ldquo;impressa&rdquo; aqui significa{" "}
-          <b>comando aceito pela impressora</b>; a prova de que saiu papel
-          continua sendo o operador bipar a etiqueta.
-        </p>
+          <Botao
+            trabalhando="Criando…"
+            className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
+          >
+            Criar bancada
+          </Botao>
+        </form>
       </section>
+
+      <ComoInstalar compacto={maquinas.length > 0} />
     </div>
+  );
+}
+
+/** O que a tela mostra enquanto nenhuma máquina apareceu. */
+function ComoComecar() {
+  return (
+    <section className="rounded-[9px] border border-atencao-linha bg-atencao-bg px-4 py-[14px]">
+      <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em] text-atencao">
+        Nenhuma máquina conectada
+      </h3>
+      <p className="mt-2 max-w-[80ch] text-[13.5px] leading-relaxed text-atencao">
+        As impressoras aparecem aqui sozinhas assim que o agente rodar numa
+        máquina do galpão. Ninguém cadastra impressora nesta tela — o agente
+        manda a lista que o sistema operacional dele enxerga, e aqui você só
+        diz qual delas é a térmica de cada bancada.
+      </p>
+    </section>
+  );
+}
+
+function ComoInstalar({ compacto }: { compacto: boolean }) {
+  return (
+    <section className="rounded-[9px] border border-linha px-4 py-[14px]">
+      <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em]">
+        Instalar o agente numa máquina
+      </h3>
+
+      <ol className="m-0 mt-2 max-w-[84ch] list-decimal pl-5 text-[13px] leading-relaxed text-suave">
+        <li className="mb-1">
+          Copie a pasta <code className="font-mono">agente</code> para o
+          computador da bancada e rode{" "}
+          <code className="rounded bg-fundo px-[5px] py-[2px] font-mono text-[12px]">
+            npm start
+          </code>
+          .
+        </li>
+        <li className="mb-1">
+          Na primeira vez ele pede <b>o e-mail e a senha do ZYNTRA</b> — os
+          mesmos que a pessoa usa no sistema. A senha não fica guardada na
+          máquina: ela vira uma credencial daquele computador.
+        </li>
+        <li>
+          Pronto. A máquina e as impressoras dela aparecem nesta tela, e é aqui
+          que você escolhe a térmica de cada bancada.
+        </li>
+      </ol>
+
+      {!compacto && (
+        <p className="mt-3 max-w-[84ch] text-[12.5px] leading-relaxed text-suave">
+          O agente existe porque navegador não fala com impressora USB e a ZD220
+          não tem rede — não há como imprimir a partir do servidor. Ele nunca
+          fala com o Mercado Livre nem com o Bling: quem busca a etiqueta é o
+          servidor, que tem as credenciais. O agente recebe texto pronto e
+          entrega à impressora.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function Aviso({ resultado }: { resultado: string }) {
+  const texto: Record<string, string> = {
+    sem_permissao: "Só um administrador mexe em máquinas e impressoras.",
+    sem_nome: "Dê um nome à bancada.",
+    maquina_nao_encontrada: "Essa máquina já não existe mais.",
+    erro: "Não foi possível concluir.",
+  };
+
+  return (
+    <p className="m-0 rounded-[9px] border border-critico-linha bg-critico-bg px-4 py-3 text-[13px] font-semibold text-critico">
+      {texto[resultado] ?? "Não foi possível concluir."}
+    </p>
   );
 }
 
@@ -277,92 +317,4 @@ function quando(iso: string) {
     month: "2-digit",
     timeZone: "America/Sao_Paulo",
   });
-}
-
-function Formulario({
-  titulo,
-  descricao,
-  acao,
-  botao,
-  children,
-}: {
-  titulo: string;
-  descricao: string;
-  acao: (formData: FormData) => Promise<void>;
-  botao: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <form
-      action={acao}
-      className="rounded-[9px] border border-linha px-4 py-[14px]"
-    >
-      <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em]">{titulo}</h3>
-      <p className="mb-3 mt-1 text-[12.5px] text-suave">{descricao}</p>
-      {children}
-      <button
-        type="submit"
-        className="mt-1 rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
-      >
-        {botao}
-      </button>
-    </form>
-  );
-}
-
-function Campo({
-  id,
-  rotulo,
-  nome,
-  valor,
-  dica,
-  obrigatorio,
-}: {
-  id: string;
-  rotulo: string;
-  nome: string;
-  valor?: string;
-  dica?: string;
-  obrigatorio?: boolean;
-}) {
-  return (
-    <div className="mb-3">
-      <label
-        htmlFor={id}
-        className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
-      >
-        {rotulo}
-      </label>
-      <input
-        id={id}
-        name={nome}
-        defaultValue={valor}
-        placeholder={dica}
-        required={obrigatorio}
-        className="w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px] outline-none focus-visible:border-tinta"
-      />
-    </div>
-  );
-}
-
-function Selo({
-  tom,
-  children,
-}: {
-  tom: "ok" | "critico" | "neutro";
-  children: React.ReactNode;
-}) {
-  const estilo =
-    tom === "ok"
-      ? "bg-ok-bg text-ok border-ok-linha"
-      : tom === "critico"
-        ? "bg-critico-bg text-critico border-critico-linha"
-        : "border-linha text-suave";
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-[9px] py-[3px] text-[11.5px] font-semibold ${estilo}`}
-    >
-      {children}
-    </span>
-  );
 }
