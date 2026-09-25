@@ -213,15 +213,53 @@ export async function Impressoras() {
 
       <section className="rounded-[9px] border border-linha px-4 py-[14px]">
         <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em]">
-          O agente ainda não existe
+          Instalar o agente na máquina da bancada
         </h3>
         <p className="mt-2 max-w-[86ch] text-[13px] leading-relaxed text-suave">
-          Esta aba já cadastra a impressora, emite o token e mostra a fila — mas
-          o programa que roda na máquina da bancada ainda não foi escrito.
-          Enquanto ele não existir, nenhuma impressora vai ficar online, e a
-          conferência vai recusar a impressão. Está assim de propósito: preferi
-          mostrar &ldquo;offline&rdquo; do que inventar um verde que não
-          corresponde a nada.
+          O navegador não fala com impressora USB, e a ZD220 não tem rede — por
+          isso existe um programa que roda <b>na máquina da bancada</b> e busca
+          a fila. Enquanto ele não estiver rodando ali, a impressora aparece
+          offline e a conferência recusa a impressão.
+        </p>
+
+        <ol className="m-0 mt-3 max-w-[86ch] list-decimal pl-5 text-[13px] leading-relaxed text-suave">
+          <li className="mb-2">
+            Instale o <b>Node.js 20 ou mais novo</b> na máquina da bancada, e
+            copie a pasta <code className="font-mono">agente</code> do projeto
+            para ela.
+          </li>
+          <li className="mb-2">
+            Descubra o nome da impressora no sistema:{" "}
+            <code className="rounded bg-fundo px-[5px] py-[2px] font-mono text-[12px]">
+              npm run impressoras
+            </code>
+            . No Windows, o que vale é o nome do{" "}
+            <b>compartilhamento</b>, não o nome amigável.
+          </li>
+          <li className="mb-2">
+            Copie <code className="font-mono">.env.exemplo</code> para{" "}
+            <code className="font-mono">.env</code> e preencha{" "}
+            <code className="font-mono">TOKEN</code> (o botão acima gera, e ele
+            aparece <b>uma vez só</b>) e{" "}
+            <code className="font-mono">IMPRESSORA</code>.
+          </li>
+          <li>
+            Rode{" "}
+            <code className="rounded bg-fundo px-[5px] py-[2px] font-mono text-[12px]">
+              npm start
+            </code>
+            . Em segundos a impressora fica online aqui. Deixe a janela aberta —
+            é ela que mantém a fila andando.
+          </li>
+        </ol>
+
+        <p className="mt-3 max-w-[86ch] text-[12.5px] leading-relaxed text-suave">
+          O agente nunca fala com o Mercado Livre: quem busca a etiqueta é o
+          servidor, que tem o token do canal. O agente recebe texto pronto e
+          manda para a impressora — assim nenhum segredo chega à máquina do
+          galpão. E &ldquo;impressa&rdquo; aqui significa{" "}
+          <b>comando aceito pela impressora</b>; a prova de que saiu papel
+          continua sendo o operador bipar a etiqueta.
         </p>
       </section>
     </div>
