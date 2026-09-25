@@ -4,12 +4,18 @@ import { useState } from "react";
 import Link from "next/link";
 import { Logotipo, SimboloZ } from "@/components/marca";
 
-export type Frente = "expedicao" | "logistica" | "integracao" | "painel";
+export type Frente =
+  | "expedicao"
+  | "logistica"
+  | "catalogo"
+  | "integracao"
+  | "painel";
 
 const FRENTES: { chave: Frente; rotulo: string; href: string }[] = [
   { chave: "painel", rotulo: "Painel", href: "/painel" },
   { chave: "expedicao", rotulo: "Expedição", href: "/expedicao" },
   { chave: "logistica", rotulo: "Logística", href: "/logistica" },
+  { chave: "catalogo", rotulo: "Catálogo", href: "/catalogo" },
   { chave: "integracao", rotulo: "Integração", href: "/integracao" },
 ];
 
@@ -282,6 +288,14 @@ function Icone({ frente }: { frente: Frente }) {
         <path d="M21 8 12 3 3 8l9 5 9-5Z" />
         <path d="M3 8v8l9 5 9-5V8" />
         <path d="M12 13v8" />
+      </svg>
+    );
+  }
+  if (frente === "catalogo") {
+    return (
+      <svg {...comum}>
+        <path d="M3 7a2 2 0 0 1 2-2h6l9 9-8 8-9-9V7Z" />
+        <circle cx="7.5" cy="9.5" r="1.3" />
       </svg>
     );
   }

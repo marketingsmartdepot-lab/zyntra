@@ -79,9 +79,9 @@ function encerrar(
   soma?: { produtos: number; criados: number; casados: number; sem_codigo: number },
   repetidos?: number,
 ): never {
-  revalidatePath("/integracao");
+  revalidatePath("/catalogo");
 
-  const p = new URLSearchParams({ aba: "catalogo", sincronia: resultado });
+  const p = new URLSearchParams({ resultado });
   if (soma) {
     p.set("lidos", String(soma.produtos));
     p.set("criados", String(soma.criados));
@@ -90,5 +90,73 @@ function encerrar(
     if (repetidos) p.set("repetidos", String(repetidos));
   }
 
-  redirect(`/integracao?${p.toString()}`);
+  redirect(`/catalogo?${p.toString()}`);
+}
+
+/**
+ * Apaga produtos do catálogo.
+ *
+ * Apagar de verdade, não esconder. O banco recusa apagar SKU que já passou por
+ * uma conferência, por uma baixa, que está ligado a um anúncio ou que é peça de
+ * um kit — nesses casos o histórico deixaria de fechar. O que não deu volta
+ * nomeado, com o motivo, em vez de o lote inteiro falhar calado.
+ */
+export async function excluirSkus(formData: FormData) {
+  const ids = formData.getAll("sku").map(String).filter(Boolean);
+  if (ids.length === 0) {
+    revalidatePath("/catalogo");
+    redirect("/catalogo?resultado=nada_selecionado");
+  }
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc("excluir_skus", { p_ids: ids });
+
+  revalidatePath("/catalogo");
+
+  if (error) redirect("/catalogo?resultado=erro");
+
+  const r = (Array.isArray(data) ? data[0] : data) as {
+    ok: boolean;
+    motivo: string;
+    apagados: number;
+    bloqueados: { codigo: string; motivo: string }[] | null;
+  } | null;
+
+  if (!r?.ok) redirect(`/catalogo?resultado=${r?.motivo ?? "erro"}`);
+
+  const p = new URLSearchParams({
+    resultado: "apagados",
+    apagados: String(r.apagados),
+  });
+  if (r.bloqueados && r.bloqueados.length > 0) {
+    p.set("bloqueados", JSON.stringify(r.bloqueados).slice(0, 1500));
+  }
+  redirect(`/catalogo?${p.toString()}`);
+}
+
+/**
+ * Busca códigos de barras no Bling, agora.
+ *
+ * O trabalho já roda sozinho de minuto em minuto; este botão é para quem não
+ * quer esperar. Uma leva pequena, porque o EAN só existe no detalhe do produto
+ * e são muitas chamadas.
+ */
+export async function buscarEans() {
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc("buscar_eans_agora", {
+    p_limite: 20,
+  });
+
+  revalidatePath("/catalogo");
+
+  if (error) redirect("/catalogo?resultado=erro");
+
+  const r = (Array.isArray(data) ? data[0] : data) as {
+    verificados: number;
+    encontrados: number;
+  } | null;
+
+  redirect(
+    `/catalogo?resultado=eans&eans=${r?.encontrados ?? 0}-${r?.verificados ?? 0}`,
+  );
 }
