@@ -5,6 +5,7 @@ import { Casca } from "@/components/casca";
 import { Barra, Indicador } from "@/components/barra";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Contas } from "./contas";
+import { AplicacaoMl } from "./ml-aplicacao";
 import { Impressoras } from "./impressoras";
 import { Operadores } from "./operadores";
 import { Estoque } from "./estoque";
@@ -31,6 +32,7 @@ export default async function PaginaIntegracao({
     aba?: string;
     falha?: string;
     bling?: string;
+    ml?: string;
     sincronia?: string;
     busca?: string;
     pagina?: string;
@@ -49,7 +51,7 @@ export default async function PaginaIntegracao({
   if (!user) redirect("/entrar?destino=/integracao");
 
   const {
-    aba: pedida, falha, bling, sincronia,
+    aba: pedida, falha, bling, ml, sincronia,
     busca, pagina, filtro,
     lidos, criados, casados, sem_codigo, repetidos,
   } = await searchParams;
@@ -188,7 +190,12 @@ export default async function PaginaIntegracao({
       />
 
       <div className="flex flex-1 flex-col bg-superficie">
-        {aba === "contas" && <Contas falha={falha} />}
+        {aba === "contas" && (
+          <>
+            <AplicacaoMl origem={origem} />
+            <Contas falha={falha} ml={ml} />
+          </>
+        )}
         {aba === "impressoras" && <Impressoras />}
         {aba === "operadores" && <Operadores falha={falha} />}
         {aba === "estoque" && (

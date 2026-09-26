@@ -1,5 +1,7 @@
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { alternarEmissao, retomarEmissao } from "./contas-acoes";
+import { conectarConta } from "./ml-acoes";
+import { Botao } from "@/components/botao";
 
 type Tom = "ok" | "atencao" | "critico" | "neutro";
 
@@ -19,6 +21,7 @@ type LinhaConta = {
   emissao_automatica: boolean;
   emissao_pausada_em: string | null;
   emissao_pausa_motivo: string | null;
+  ultimo_erro: string | null;
   canais: { nome: string; entra_na_esteira: boolean } | null;
   empresas: {
     razao_social: string;
@@ -28,14 +31,14 @@ type LinhaConta = {
   pools_estoque: { nome: string } | null;
 };
 
-export async function Contas({ falha }: { falha?: string }) {
+export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
   const supabase = await criarClienteServidor();
 
   const { data, error } = await supabase
     .from("contas")
     .select(
       `id, apelido, ref_externa, situacao, entra_na_esteira,
-       emissao_automatica, emissao_pausada_em, emissao_pausa_motivo,
+       emissao_automatica, emissao_pausada_em, emissao_pausa_motivo, ultimo_erro,
        canais ( nome, entra_na_esteira ),
        empresas:empresa_emissora_id ( razao_social, serie_nfe, faturador_situacao ),
        pools_estoque:pool_estoque_id ( nome )`,
@@ -56,16 +59,20 @@ export async function Contas({ falha }: { falha?: string }) {
 
   if (contas.length === 0) {
     return (
-      <Aviso
-        titulo="Nenhuma conta conectada"
-        texto="Conectar a primeira conta do Mercado Livre depende das credenciais da aplicação ML da Smart Depot. A emissão do dia a dia é por API, sem ninguém abrir o painel — mas o Faturador precisa estar configurado naquele CNPJ antes, com certificado A1 e dados fiscais dos anúncios."
-      />
+      <>
+        {ml && <ResultadoMl ml={ml} />}
+        <Aviso
+          titulo="Nenhuma conta conectada"
+          texto="Cadastre o aplicativo do Mercado Livre acima e clique em Conectar uma conta. A conta entra com o apelido que ela tem no ML. A emissão do dia a dia é por API, sem ninguém abrir o painel — mas o Faturador precisa estar configurado naquele CNPJ antes, com certificado A1 e dados fiscais dos anúncios."
+        />
+      </>
     );
   }
 
   return (
     <div className="flex flex-col">
       {falha && <Resultado resultado={falha} />}
+      {ml && <ResultadoMl ml={ml} />}
 
       <div className="overflow-x-auto">
       <table className="w-full border-collapse">
@@ -154,15 +161,33 @@ export async function Contas({ falha }: { falha?: string }) {
                   )}
                 </Celula>
                 <Celula>
-                  <span className="text-[11.5px] text-suave">
-                    {fora
-                      ? "fora da esteira — a mercadoria está no galpão do ML"
-                      : c.situacao === "conectada"
-                        ? "conectada"
-                        : c.situacao === "erro"
-                          ? "com erro"
-                          : "desconectada"}
-                  </span>
+                  {fora ? (
+                    <span className="text-[11.5px] text-suave">
+                      fora da esteira — a mercadoria está no galpão do ML
+                    </span>
+                  ) : c.situacao === "conectada" ? (
+                    <Selo tom="ok">Conectada</Selo>
+                  ) : (
+                    <>
+                      <Selo tom="critico">
+                        {c.situacao === "erro" ? "Com erro" : "Desconectada"}
+                      </Selo>
+                      {c.ultimo_erro && (
+                        <div className="mt-[2px] max-w-[30ch] text-[11px] leading-snug text-suave">
+                          {c.ultimo_erro}
+                        </div>
+                      )}
+                      <form action={conectarConta} className="mt-[6px]">
+                        <input type="hidden" name="conta" value={c.id} />
+                        <Botao
+                          trabalhando="Abrindo…"
+                          className="rounded-lg border border-linha px-3 py-[6px] text-[12px] font-semibold"
+                        >
+                          Reconectar
+                        </Botao>
+                      </form>
+                    </>
+                  )}
                 </Celula>
               </tr>
             );
@@ -317,5 +342,56 @@ function Selo({ tom, children }: { tom: Tom; children: React.ReactNode }) {
     >
       {children}
     </span>
+  );
+}
+
+/**
+ * O que aconteceu na volta do Mercado Livre.
+ *
+ * Cada motivo aqui corresponde a uma recusa que a API do ML realmente devolve,
+ * traduzida para o que a pessoa tem de fazer. "Deu erro" não ajuda ninguém às
+ * seis da tarde com o galpão esperando.
+ */
+function ResultadoMl({ ml }: { ml: string }) {
+  const bons: Record<string, string> = {
+    ok: "Conta conectada.",
+    app_salvo: "Credenciais do aplicativo guardadas.",
+  };
+
+  const ruins: Record<string, string> = {
+    recusado_no_ml: "Você cancelou a autorização no Mercado Livre.",
+    retorno_incompleto: "O Mercado Livre voltou sem o código. Tente de novo.",
+    estado_invalido:
+      "Este retorno já foi usado ou passou dos 10 minutos. Comece de novo em Conectar uma conta.",
+    codigo_expirado:
+      "O código de autorização venceu ou já tinha sido usado. Comece de novo — não atualize a página do retorno.",
+    credencial_do_app_errada:
+      "O Mercado Livre não reconheceu o Client ID ou o Client Secret. Confira os dois no DevCenter.",
+    conta_do_ml_diferente:
+      "Você entrou em outra conta do Mercado Livre. Saia do ML, entre na conta certa e reconecte.",
+    aplicacao_nao_configurada:
+      "Cadastre o Client ID e o Client Secret do aplicativo antes de conectar contas.",
+    sem_redirect_uri: "Falta a URL de redirecionamento no aplicativo.",
+    redirect_invalido: "A URL de redirecionamento precisa começar com https.",
+    faltou_credencial: "Client ID e Client Secret são obrigatórios.",
+    conta_nao_encontrada: "Essa conta já não existe.",
+    canal_inexistente: "O canal Mercado Livre não está cadastrado.",
+    resposta_incompleta: "O Mercado Livre respondeu sem token. Tente de novo.",
+    rede: "Não foi possível falar com o Mercado Livre agora.",
+    so_admin: "Só um administrador conecta contas.",
+  };
+
+  const bom = bons[ml];
+
+  return (
+    <p
+      className={`m-5 mb-0 rounded-[9px] border px-4 py-3 text-[13px] font-semibold ${
+        bom
+          ? "border-[var(--color-ok)] bg-[var(--color-ok-bg)] text-[var(--color-ok)]"
+          : "border-critico-linha bg-critico-bg text-critico"
+      }`}
+    >
+      {bom ?? ruins[ml] ?? "Não foi possível concluir."}
+    </p>
   );
 }
