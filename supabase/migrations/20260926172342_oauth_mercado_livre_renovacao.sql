@@ -1,3 +1,8 @@
+-- CORRIGIDA logo depois, em 20260926175500: esta função era uma DUPLICATA.
+-- Já existia `public.renovar_credencial_ml`, que é a que o cron chama, e eu
+-- não a encontrei porque procurei por "conta" e o nome tem "credencial".
+-- A migração seguinte apaga esta e leva o conteúdo para aquela.
+
 /**
  * Renova o token de uma conta do Mercado Livre.
  *
