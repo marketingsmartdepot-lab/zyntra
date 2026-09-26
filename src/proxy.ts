@@ -1,8 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-/** Rotas que podem ser abertas sem sessão. */
-const PUBLICAS = ["/entrar", "/auth"];
+/**
+ * Rotas que podem ser abertas sem sessão.
+ *
+ * `/api/ml/notificacoes` está aqui por obrigação: quem chama é o Mercado
+ * Livre, que não tem login no ZYNTRA. A porta daquela rota é o
+ * `application_id` conferido dentro do banco, não a sessão.
+ */
+const PUBLICAS = ["/entrar", "/auth", "/api/ml/notificacoes"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
