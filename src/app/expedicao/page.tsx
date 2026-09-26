@@ -98,6 +98,14 @@ export default async function PaginaExpedicao({
     .order("etapa_desde", { ascending: true })
     .limit(200);
 
+  // Etapa vazia não quer dizer a mesma coisa antes e depois de haver conta.
+  // Sem esta contagem, a tela dizia "nenhuma conta conectada" com uma conta
+  // conectada e sete pedidos na aba ao lado.
+  const { count: contasConectadas } = await supabase
+    .from("contas")
+    .select("id", { count: "exact", head: true })
+    .eq("situacao", "conectada");
+
   return (
     <Casca
       frente="expedicao"
@@ -191,7 +199,7 @@ export default async function PaginaExpedicao({
             critico
           />
         ) : !pacotes || pacotes.length === 0 ? (
-          <Vazio {...vazioDaEtapa(etapaAtiva)} />
+          <Vazio {...vazioDaEtapa(etapaAtiva, (contasConectadas ?? 0) > 0)} />
         ) : (
           <div className="flex flex-1 flex-col">
             <ListaPacotes
@@ -237,7 +245,22 @@ function Explicacao({ vista }: { vista: Vista }) {
   return <span>{texto[vista]}</span>;
 }
 
-function vazioDaEtapa(etapa: Etapa) {
+/**
+ * O que dizer quando a etapa está vazia.
+ *
+ * Vazio por não haver conta e vazio por não haver trabalho são coisas
+ * diferentes, e dizer a primeira quando é a segunda manda a pessoa procurar
+ * defeito onde não há.
+ */
+function vazioDaEtapa(etapa: Etapa, temConta: boolean) {
+  if (!temConta) {
+    return {
+      titulo: "Nenhuma conta conectada",
+      texto:
+        "A esteira fica vazia até a primeira conta do Mercado Livre ser ligada na Integração. Nada aqui é dado de exemplo.",
+    };
+  }
+
   if (etapa === "aberto") {
     return {
       titulo: "Nada parado",
@@ -245,6 +268,7 @@ function vazioDaEtapa(etapa: Etapa) {
         "Em operação normal esta aba fica vazia. Se encher, o problema é de cadastro ou de configuração — não de volume.",
     };
   }
+
   if (etapa === "retido") {
     return {
       titulo: "Nenhum pedido retido",
@@ -252,10 +276,35 @@ function vazioDaEtapa(etapa: Etapa) {
         "Aqui aparece o que não depende de cadastro nosso. Quando resolver, o pedido volta para a etapa de onde saiu.",
     };
   }
+
+  if (etapa === "faturado") {
+    return {
+      titulo: "Ninguém esperando etiqueta",
+      texto:
+        "Os pedidos param aqui só enquanto o Mercado Livre não libera a etiqueta. Assim que ela sai, seguem sozinhos para Separar.",
+    };
+  }
+
+  if (etapa === "separar") {
+    return {
+      titulo: "Nada para separar",
+      texto:
+        "O pedido chega aqui quando a nota está autorizada e a etiqueta foi obtida. Enquanto isso ele fica em Faturado ou em Aberto.",
+    };
+  }
+
+  if (etapa === "conferir") {
+    return {
+      titulo: "Nada para conferir",
+      texto:
+        "Os pedidos chegam aqui ao gerar a lista de separação, na aba Separar.",
+    };
+  }
+
   return {
-    titulo: "Nenhuma conta conectada",
+    titulo: "Nada pronto pra envio",
     texto:
-      "A esteira fica vazia até a primeira conta do Mercado Livre ser ligada na Integração. Nada aqui é dado de exemplo.",
+      "Aqui ficam as caixas lacradas, esperando alguém levá-las para a doca.",
   };
 }
 
