@@ -1,0 +1,12 @@
+-- Primeira versão de `public.sincronizar_pedidos_ml`.
+--
+-- Substituída no mesmo dia por 20260926233325 e 20260926233538, depois de
+-- rodar contra a conta real e descobrir duas coisas que eu havia suposto
+-- errado. O corpo final está em 20260926233538; este arquivo registra que a
+-- função nasceu aqui.
+--
+-- O que estava errado:
+--   * `volumes` tem padrão 1 e não aceita nulo, e eu mandava nulo explícito,
+--     atropelando o padrão.
+--   * o header `x-format-new` mudava a forma da resposta do envio, e a
+--     modalidade não casava com nada.

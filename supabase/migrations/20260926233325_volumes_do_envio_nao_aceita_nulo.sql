@@ -1,0 +1,5 @@
+-- `volumes` tem padrão 1 e não aceita nulo. Mandar nulo explícito atropela o
+-- padrão em vez de usá-lo — e o envio do ML não traz esse número no formato
+-- que eu supus. Uma caixa é um volume até prova em contrário.
+--
+-- Corpo completo em 20260926233538, que é a versão que ficou.
