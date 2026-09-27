@@ -183,7 +183,23 @@ export default async function PaginaExpedicao({
         {vista === "listas" ? (
           <PainelListas listaId={lista} impressao={impressao} />
         ) : vista === "aberto" && !pacote ? (
-          <AbertoPorCausa resultado={reprocesso} />
+          /* Agrupar por causa serve para consertar uma vez e liberar trinta.
+             Mas ela também precisa ver e ABRIR cada pedido — é assim que ela
+             trabalha hoje na Lexos. As duas coisas convivem: a causa em cima,
+             os pedidos embaixo, na mesma lista das outras abas. */
+          <div className="flex flex-1 flex-col overflow-y-auto">
+            <AbertoPorCausa
+              resultado={reprocesso}
+              temPacotes={(pacotes?.length ?? 0) > 0}
+            />
+            {pacotes && pacotes.length > 0 && (
+              <ListaPacotes
+                pacotes={pacotes as unknown as LinhaPacote[]}
+                etapa="aberto"
+                vista="aberto"
+              />
+            )}
+          </div>
         ) : pacote ? (
           <PainelDetalhe
             fila={(pacotes ?? []) as never[]}

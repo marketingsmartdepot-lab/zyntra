@@ -47,7 +47,18 @@ const ROTULO: Record<string, string> = {
  * Agrupado por causa, não por pedido. Um NCM faltando trava trinta pedidos:
  * listados um a um, o time resolve o mesmo problema trinta vezes.
  */
-export async function AbertoPorCausa({ resultado }: { resultado?: string }) {
+export async function AbertoPorCausa({
+  resultado,
+  temPacotes,
+}: {
+  resultado?: string;
+  /**
+   * Há pacotes listados logo abaixo? Se houver, o "Nada parado" daqui seria
+   * mentira: não há CAUSA agrupada, mas há pedido parado. Quem fala nesse caso
+   * é a lista.
+   */
+  temPacotes?: boolean;
+}) {
   const supabase = await criarClienteServidor();
 
   const [{ data: causas }, { data: pausadas }] = await Promise.all([
@@ -63,7 +74,7 @@ export async function AbertoPorCausa({ resultado }: { resultado?: string }) {
   const total = lista.reduce((t, c) => t + c.pacotes, 0);
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-col">
       {paradas.map((c) => (
         <div
           key={c.id}
@@ -99,7 +110,7 @@ export async function AbertoPorCausa({ resultado }: { resultado?: string }) {
 
       {resultado && <AvisoReprocesso resultado={resultado} />}
 
-      {lista.length === 0 ? (
+      {lista.length === 0 && temPacotes ? null : lista.length === 0 ? (
         <div className="flex flex-1 items-center justify-center px-6 py-20">
           <div className="max-w-[52ch] text-center">
             <h2 className="text-[20px] font-bold tracking-[-0.02em]">
