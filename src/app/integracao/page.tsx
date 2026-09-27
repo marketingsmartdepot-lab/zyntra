@@ -7,7 +7,6 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import { Contas } from "./contas";
 import { AplicacaoMl } from "./ml-aplicacao";
 import { Impressoras } from "./impressoras";
-import { Operadores } from "./operadores";
 import { Estoque } from "./estoque";
 import { Cadastros } from "./cadastros";
 import { Equipe } from "./equipe";
@@ -17,10 +16,9 @@ export const metadata = { title: "Integração — ZYNTRA" };
 const ABAS = [
   { chave: "contas", rotulo: "Conexão das contas" },
   { chave: "impressoras", rotulo: "Estações e impressoras" },
-  { chave: "operadores", rotulo: "Operadores" },
   { chave: "estoque", rotulo: "Estoque" },
   { chave: "cadastros", rotulo: "Cadastros" },
-  { chave: "equipe", rotulo: "Equipe" },
+  { chave: "equipe", rotulo: "Pessoas" },
 ] as const;
 
 type Aba = (typeof ABAS)[number]["chave"];
@@ -66,15 +64,10 @@ export default async function PaginaIntegracao({
     ? (pedida as Aba)
     : "contas";
 
-  const [{ count: contas }, { count: impressoras }, { count: operadores }] =
-    await Promise.all([
-      supabase.from("contas").select("id", { count: "exact", head: true }),
-      supabase.from("impressoras").select("id", { count: "exact", head: true }),
-      supabase
-        .from("operadores")
-        .select("id", { count: "exact", head: true })
-        .eq("ativo", true),
-    ]);
+  const [{ count: contas }, { count: impressoras }] = await Promise.all([
+    supabase.from("contas").select("id", { count: "exact", head: true }),
+    supabase.from("impressoras").select("id", { count: "exact", head: true }),
+  ]);
 
   // A fila de baixas na aba: se encher, alguma coisa não está saindo.
   const { count: baixasNaFila } = await supabase
@@ -93,12 +86,11 @@ export default async function PaginaIntegracao({
   const conectadas = linhas.filter((l) => l.conectada).length;
   const expiradas = linhas.filter((l) => l.expirada).length;
 
-  // Quem hoje consegue entrar. É o número que importa nesta aba: perfil
-  // inativo existe mas não enxerga nada.
-  const { count: comAcesso } = await supabase
-    .from("perfis")
-    .select("id", { count: "exact", head: true })
-    .eq("ativo", true);
+  // Toda pessoa do galpão, com login ou com PIN. Contar só quem tem e-mail
+  // deixava de fora justamente quem trabalha na bancada.
+  const { count: pessoas } = await supabase
+    .from("pessoas")
+    .select("pessoa_id", { count: "exact", head: true });
 
   const { count: empresas } = await supabase
     .from("empresas")
@@ -125,13 +117,6 @@ export default async function PaginaIntegracao({
             ativa: aba === "impressoras",
           },
           {
-            chave: "operadores",
-            href: "/integracao?aba=operadores",
-            rotulo: "Operadores",
-            contagem: operadores ?? 0,
-            ativa: aba === "operadores",
-          },
-          {
             chave: "estoque",
             href: "/integracao?aba=estoque",
             rotulo: "Estoque",
@@ -151,8 +136,8 @@ export default async function PaginaIntegracao({
           {
             chave: "equipe",
             href: "/integracao?aba=equipe",
-            rotulo: "Equipe",
-            contagem: comAcesso ?? 0,
+            rotulo: "Pessoas",
+            contagem: pessoas ?? 0,
             ativa: aba === "equipe",
           },
         ]}
@@ -177,14 +162,12 @@ export default async function PaginaIntegracao({
               "Quem fatura e de quem é o estoque são coisas separadas. Aqui isso fica explícito."}
             {aba === "impressoras" &&
               "A impressora é alcançada por um agente na máquina da bancada. Navegador não fala com USB."}
-            {aba === "operadores" &&
-              "Quem trabalha na bancada não usa e-mail e senha: entra com nome e PIN. São coisas separadas de propósito."}
             {aba === "estoque" &&
               "A baixa acontece quando a NF-e é autorizada, não quando a caixa sai — senão a peça segue vendável por horas."}
             {aba === "cadastros" &&
               "O que o sistema lê e ninguém tinha onde criar. Muda raramente, então fica tudo junto."}
             {aba === "equipe" &&
-              "Quem tem login no sistema. Só quem está autorizado aqui enxerga alguma coisa — o resto vê uma tela vazia."}
+              "Toda pessoa do ZYNTRA, com login ou com PIN de bancada. É aqui que se escolhe o que cada uma enxerga e faz."}
           </>
         }
       />
@@ -197,7 +180,6 @@ export default async function PaginaIntegracao({
           </>
         )}
         {aba === "impressoras" && <Impressoras />}
-        {aba === "operadores" && <Operadores falha={falha} />}
         {aba === "estoque" && (
           <Estoque falha={falha} bling={bling} origem={origem} />
         )}
