@@ -11,6 +11,7 @@ import {
 } from "@/lib/supabase/tipos";
 import { Barra } from "@/components/barra";
 import { ListaPacotes } from "./lista";
+import { permissoesDeAgora } from "@/lib/permissoes";
 import { AbrirCarrinho } from "../logistica/abrir-carrinho";
 import { PainelDetalhe } from "./conferencia/painel";
 import { PainelListas } from "./listas/painel";
@@ -58,6 +59,10 @@ export default async function PaginaExpedicao({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/entrar?destino=/expedicao");
+
+  // O que esta pessoa pode fazer na esteira. A Casca já barra quem não enxerga
+  // a Expedição; aqui é o nível de dentro, que decide quais botões existem.
+  const pode = await permissoesDeAgora();
 
   const {
     etapa: pedida,
@@ -247,6 +252,7 @@ export default async function PaginaExpedicao({
                 vista="aberto"
                 valores={(valoresDeFiltro ?? []) as ValorDeFiltro[]}
                 filtros={filtrosAtivos}
+                permissoes={[...pode]}
               />
             )}
           </div>
@@ -275,6 +281,7 @@ export default async function PaginaExpedicao({
               vista={vista}
               valores={(valoresDeFiltro ?? []) as ValorDeFiltro[]}
               filtros={filtrosAtivos}
+              permissoes={[...pode]}
             />
             {/* O fechamento mora aqui: quando a caixa está pronta pra envio, o
                 passo seguinte é levá-la para a doca. Mandar a pessoa trocar de

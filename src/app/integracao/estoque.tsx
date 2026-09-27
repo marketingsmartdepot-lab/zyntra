@@ -1,3 +1,4 @@
+import { permissoesDeAgora } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ConexaoBling } from "./bling";
 import {
@@ -45,6 +46,11 @@ export async function Estoque({
 }) {
   const supabase = await criarClienteServidor();
 
+  // Quem enxerga a Integração confere como está; quem pode mexer vê os
+  // formulários. A trava de verdade está no banco — aqui é para a tela
+  // não oferecer o que o banco vai recusar.
+  const podeMexer = (await permissoesDeAgora()).has("mexer_integracao");
+
   const [{ data: config }, { data: fila }] =
     await Promise.all([
     supabase
@@ -85,92 +91,94 @@ export async function Estoque({
           preencher um formulário que não tem para onde mandar nada. */}
       <ConexaoBling resultado={bling} origem={origem} />
 
-      <form
-        action={salvarDeposito}
-        className="max-w-[560px] rounded-[9px] border border-linha px-4 py-[14px]"
-      >
-        <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em]">
-          Depósito do Bling
-        </h3>
-        <p className="mb-3 mt-1 text-[12.5px] leading-relaxed text-suave">
-          De qual depósito o estoque sai. Hoje é um só. Se mudar, as baixas
-          novas vão para o depósito novo — e um estorno de baixa antiga volta
-          para onde a peça realmente saiu, não para o depósito atual.
-          {depositos.length > 0 && (
-            <>
-              {" "}
-              A lista vem do próprio Bling: o id do depósito não aparece na
-              interface dele, só na API.
-            </>
-          )}
-        </p>
-
-        <label
-          htmlFor="erp-deposito"
-          className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+      {podeMexer && (
+        <form
+          action={salvarDeposito}
+          className="max-w-[560px] rounded-[9px] border border-linha px-4 py-[14px]"
         >
-          Depósito
-        </label>
-
-        {depositos.length > 0 ? (
-          <select
-            id="erp-deposito"
-            name="deposito"
-            defaultValue={c?.deposito_ref ?? ""}
-            className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
+          <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em]">
+            Depósito do Bling
+          </h3>
+          <p className="mb-3 mt-1 text-[12.5px] leading-relaxed text-suave">
+            De qual depósito o estoque sai. Hoje é um só. Se mudar, as baixas
+            novas vão para o depósito novo — e um estorno de baixa antiga volta
+            para onde a peça realmente saiu, não para o depósito atual.
+            {depositos.length > 0 && (
+              <>
+                {" "}
+                A lista vem do próprio Bling: o id do depósito não aparece na
+                interface dele, só na API.
+              </>
+            )}
+          </p>
+  
+          <label
+            htmlFor="erp-deposito"
+            className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
           >
-            <option value="">— escolha o depósito —</option>
-            {depositos.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.nome}
-                {d.padrao ? " (padrão)" : ""}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <>
-            {/* Sem a lista, o campo continua existindo: quem já tem o id
-                anotado não fica preso esperando a conexão voltar. */}
-            <input
+            Depósito
+          </label>
+  
+          {depositos.length > 0 ? (
+            <select
               id="erp-deposito"
               name="deposito"
               defaultValue={c?.deposito_ref ?? ""}
-              placeholder="o id do depósito no Bling"
-              className="mb-2 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13.5px]"
+              className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
+            >
+              <option value="">— escolha o depósito —</option>
+              {depositos.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.nome}
+                  {d.padrao ? " (padrão)" : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              {/* Sem a lista, o campo continua existindo: quem já tem o id
+                  anotado não fica preso esperando a conexão voltar. */}
+              <input
+                id="erp-deposito"
+                name="deposito"
+                defaultValue={c?.deposito_ref ?? ""}
+                placeholder="o id do depósito no Bling"
+                className="mb-2 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13.5px]"
+              />
+              <p className="mb-3 text-[12.5px] text-suave">
+                <SemLista motivo={dep?.motivo} detalhe={dep?.detalhe} />
+              </p>
+            </>
+          )}
+  
+          <label
+            htmlFor="erp-ativo"
+            className="mb-3 flex cursor-pointer items-baseline gap-[9px] text-[13px]"
+          >
+            <input
+              id="erp-ativo"
+              type="checkbox"
+              name="ativo"
+              defaultChecked={c?.ativo ?? false}
+              className="accent-[var(--color-tinta)]"
             />
-            <p className="mb-3 text-[12.5px] text-suave">
-              <SemLista motivo={dep?.motivo} detalhe={dep?.detalhe} />
-            </p>
-          </>
-        )}
-
-        <label
-          htmlFor="erp-ativo"
-          className="mb-3 flex cursor-pointer items-baseline gap-[9px] text-[13px]"
-        >
-          <input
-            id="erp-ativo"
-            type="checkbox"
-            name="ativo"
-            defaultChecked={c?.ativo ?? false}
-            className="accent-[var(--color-tinta)]"
-          />
-          <span>
-            <b className="font-semibold">Enviar as baixas para o Bling</b>
-            <span className="block text-[12px] text-suave">
-              Desligado, a baixa entra na fila e fica esperando. Nada se perde —
-              e nada é enviado.
+            <span>
+              <b className="font-semibold">Enviar as baixas para o Bling</b>
+              <span className="block text-[12px] text-suave">
+                Desligado, a baixa entra na fila e fica esperando. Nada se perde —
+                e nada é enviado.
+              </span>
             </span>
-          </span>
-        </label>
-
-        <button
-          type="submit"
-          className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
-        >
-          Salvar
-        </button>
-      </form>
+          </label>
+  
+          <button
+            type="submit"
+            className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
+          >
+            Salvar
+          </button>
+        </form>
+      )}
 
       {/* O catálogo ganhou aba própria: são milhares de linhas, e aqui elas
           afogavam o que esta aba realmente trata, que é a fila de baixas. */}
@@ -261,14 +269,16 @@ export async function Estoque({
             </div>
 
             {comErro.length > 0 && (
-              <form action={tentarBaixaDeNovo} className="mt-3">
-                <button
-                  type="submit"
-                  className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
-                >
-                  Tentar as {comErro.length} de novo
-                </button>
-              </form>
+              podeMexer && (
+                <form action={tentarBaixaDeNovo} className="mt-3">
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
+                  >
+                    Tentar as {comErro.length} de novo
+                  </button>
+                </form>
+              )
             )}
           </>
         )}

@@ -63,3 +63,32 @@ export async function definirPapel(formData: FormData) {
   const r = Array.isArray(data) ? data[0] : data;
   encerrar(error ? "erro" : r?.ok ? undefined : r?.motivo);
 }
+
+/**
+ * Define o que uma pessoa enxerga e faz.
+ *
+ * A tela manda a lista inteira, não uma marcação por vez: desmarcar é tão
+ * importante quanto marcar, e um envio por caixinha faria a pessoa clicar
+ * dez vezes para tirar dez permissões.
+ */
+export async function definirPermissoes(formData: FormData) {
+  const pessoa = String(formData.get("pessoa") ?? "");
+  if (!pessoa) return;
+
+  const permissoes = formData.getAll("permissao").map(String).filter(Boolean);
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc("definir_permissoes", {
+    p_pessoa: pessoa,
+    p_permissoes: permissoes,
+  });
+
+  revalidatePath("/integracao");
+
+  const r = Array.isArray(data) ? data[0] : data;
+  redirect(
+    `/integracao?aba=equipe&falha=${
+      error ? "erro" : r?.ok ? "permissoes_salvas" : (r?.motivo ?? "erro")
+    }`,
+  );
+}

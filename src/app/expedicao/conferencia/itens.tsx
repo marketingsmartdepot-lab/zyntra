@@ -1,3 +1,4 @@
+import { permissoesDeAgora } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
 type LinhaItem = {
@@ -52,6 +53,11 @@ export async function BlocoDoPedido({
   conferenciaId?: string | null;
 }) {
   const supabase = await criarClienteServidor();
+
+  // Preço na bancada é opcional de propósito: quem confere caixa precisa saber
+  // O QUE e QUANTOS, não quanto o cliente pagou. Quem tem "Valores e custos"
+  // continua vendo a coluna e o total.
+  const veValores = (await permissoesDeAgora()).has("ver_valores");
 
   const { data: pacote } = await supabase
     .from("pacotes")
@@ -245,7 +251,9 @@ export async function BlocoDoPedido({
               <Cabecalho largura="132px">Sku</Cabecalho>
               <Cabecalho>Descrição</Cabecalho>
               <Cabecalho largura="76px" direita>Qtd</Cabecalho>
-              <Cabecalho largura="116px" direita>Preço</Cabecalho>
+              {veValores && (
+                <Cabecalho largura="116px" direita>Preço</Cabecalho>
+              )}
               <Cabecalho largura="86px" direita>Lido</Cabecalho>
             </tr>
           </thead>
@@ -278,16 +286,18 @@ export async function BlocoDoPedido({
                       {l.quantidade}
                     </span>
                   </Celula>
-                  <Celula direita>
-                    <span className="font-mono text-[13px] text-suave tabular-nums">
-                      {l.preco_unitario === null
-                        ? "—"
-                        : Number(l.preco_unitario).toLocaleString("pt-BR", {
-                            style: "currency",
-                            currency: "BRL",
-                          })}
-                    </span>
-                  </Celula>
+                  {veValores && (
+                    <Celula direita>
+                      <span className="font-mono text-[13px] text-suave tabular-nums">
+                        {l.preco_unitario === null
+                          ? "—"
+                          : Number(l.preco_unitario).toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
+                      </span>
+                    </Celula>
+                  )}
                   <Celula direita>
                     <span
                       className={`font-mono text-[13px] font-semibold tabular-nums ${
@@ -313,12 +323,14 @@ export async function BlocoDoPedido({
               <td className="px-3 py-[10px] text-right font-mono text-[13px] font-semibold tabular-nums">
                 {unidades}
               </td>
-              <td className="px-3 py-[10px] text-right font-mono text-[13px] font-semibold tabular-nums">
-                {total.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              </td>
+              {veValores && (
+                <td className="px-3 py-[10px] text-right font-mono text-[13px] font-semibold tabular-nums">
+                  {total.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })}
+                </td>
+              )}
               <td className="px-3 py-[10px]" />
             </tr>
           </tfoot>

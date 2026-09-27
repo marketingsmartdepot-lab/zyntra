@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { permissoesDeAgora } from "@/lib/permissoes";
 
 /**
  * A etiqueta em PDF, para ver na tela.
@@ -24,6 +25,14 @@ export async function GET(
   } = await supabase.auth.getUser();
   if (!user) {
     return new NextResponse("Entre no ZYNTRA para ver a etiqueta.", { status: 401 });
+  }
+
+  // Esta URL não passa pela casca do sistema, então a trava da Expedição tem
+  // de estar aqui também: um link de etiqueta colado no WhatsApp continua
+  // sendo uma porta.
+  const pode = await permissoesDeAgora();
+  if (!pode.has("ver_expedicao")) {
+    return new NextResponse("Sem permissão de ver a Expedição.", { status: 403 });
   }
 
   const { data } = await supabase

@@ -1,4 +1,5 @@
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { PermissoesDaPessoa, type Permissao } from "./permissoes";
 import { autorizarPessoa, definirPapel, revogarPessoa } from "./equipe-acoes";
 
 type Pessoa = {
@@ -9,6 +10,7 @@ type Pessoa = {
   ativo: boolean;
   criado_em: string;
   autorizada: boolean;
+  permissoes: string[] | null;
 };
 
 type Convite = {
@@ -42,12 +44,15 @@ const PAPEIS = ["operador", "lider", "analista", "admin"] as const;
 export async function Equipe({ falha }: { falha?: string }) {
   const supabase = await criarClienteServidor();
 
-  const [{ data: pessoas }, { data: convites }] = await Promise.all([
+  const [{ data: pessoas }, { data: convites }, { data: possiveis }] =
+    await Promise.all([
     supabase.from("equipe_resumo").select("*").order("criado_em"),
     supabase.from("equipe_autorizada").select("*").order("criada_em"),
-  ]);
+    supabase.rpc("permissoes_possiveis"),
+    ]);
 
   const lista = (pessoas ?? []) as Pessoa[];
+  const permissoes = (possiveis ?? []) as Permissao[];
   const pendentes = ((convites ?? []) as Convite[]).filter((c) => !c.usada_em);
   const semAutorizacao = lista.filter((p) => !p.ativo);
 
@@ -150,7 +155,7 @@ export async function Equipe({ falha }: { falha?: string }) {
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                {["Pessoa", "Papel", "Situação", ""].map((c) => (
+                {["Pessoa", "Papel", "O que pode", "Situação", ""].map((c) => (
                   <th
                     key={c}
                     className="border-b border-linha px-4 py-[10px] text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-suave"
@@ -193,6 +198,15 @@ export async function Equipe({ falha }: { falha?: string }) {
                         Salvar
                       </button>
                     </form>
+                  </td>
+
+                  <td className="border-b border-linha-suave px-4 py-[10px] align-top">
+                    <PermissoesDaPessoa
+                      pessoa={p.id}
+                      papel={p.papel}
+                      marcadas={p.permissoes ?? []}
+                      possiveis={permissoes}
+                    />
                   </td>
                   <td className="border-b border-linha-suave px-4 py-[10px]">
                     {p.ativo ? (

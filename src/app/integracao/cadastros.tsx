@@ -1,3 +1,4 @@
+import { permissoesDeAgora } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import {
   atualizarFaturador,
@@ -60,6 +61,11 @@ const FATURADOR = [
 export async function Cadastros({ falha }: { falha?: string }) {
   const supabase = await criarClienteServidor();
 
+  // Quem enxerga a Integração confere como está; quem pode mexer vê os
+  // formulários. A trava de verdade está no banco — aqui é para a tela
+  // não oferecer o que o banco vai recusar.
+  const podeMexer = (await permissoesDeAgora()).has("mexer_integracao");
+
   const [{ data: empresas }, { data: canais }, { data: modalidades }, { data: custos }] =
     await Promise.all([
       supabase
@@ -113,45 +119,49 @@ export async function Cadastros({ falha }: { falha?: string }) {
                     ?.rotulo ?? e.faturador_situacao}
                 </Celula>
                 <Celula>
-                  <form
-                    action={atualizarFaturador}
-                    className="flex flex-wrap items-end gap-2"
-                  >
-                    <input type="hidden" name="empresa" value={e.id} />
-                    <select
-                      name="faturador"
-                      defaultValue={e.faturador_situacao}
-                      aria-label={`Situação do faturador de ${e.nome_curto}`}
-                      className="rounded-lg border border-linha bg-superficie px-[9px] py-[6px] text-[12px]"
+                  {podeMexer && (
+                    <form
+                      action={atualizarFaturador}
+                      className="flex flex-wrap items-end gap-2"
                     >
-                      {FATURADOR.map((f) => (
-                        <option key={f.valor} value={f.valor}>
-                          {f.rotulo}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      name="serie_nfe"
-                      defaultValue={e.serie_nfe ?? ""}
-                      placeholder="série"
-                      aria-label={`Série da NF-e de ${e.nome_curto}`}
-                      className="w-[68px] rounded-lg border border-linha bg-superficie px-[9px] py-[6px] font-mono text-[12px]"
-                    />
-                    <Botao>Salvar</Botao>
-                  </form>
+                      <input type="hidden" name="empresa" value={e.id} />
+                      <select
+                        name="faturador"
+                        defaultValue={e.faturador_situacao}
+                        aria-label={`Situação do faturador de ${e.nome_curto}`}
+                        className="rounded-lg border border-linha bg-superficie px-[9px] py-[6px] text-[12px]"
+                      >
+                        {FATURADOR.map((f) => (
+                          <option key={f.valor} value={f.valor}>
+                            {f.rotulo}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        name="serie_nfe"
+                        defaultValue={e.serie_nfe ?? ""}
+                        placeholder="série"
+                        aria-label={`Série da NF-e de ${e.nome_curto}`}
+                        className="w-[68px] rounded-lg border border-linha bg-superficie px-[9px] py-[6px] font-mono text-[12px]"
+                      />
+                      <Botao>Salvar</Botao>
+                    </form>
+                  )}
                 </Celula>
               </tr>
             ))}
           </Tabela>
         )}
 
-        <form action={criarEmpresa} className="flex flex-wrap items-end gap-2">
-          <Campo nome="razao_social" rotulo="Razão social" largura="240px" obrigatorio />
-          <Campo nome="nome_curto" rotulo="Nome curto" largura="130px" obrigatorio />
-          <Campo nome="cnpj" rotulo="CNPJ" largura="150px" mono />
-          <Campo nome="serie_nfe" rotulo="Série" largura="70px" mono />
-          <Botao principal>Cadastrar empresa</Botao>
-        </form>
+        {podeMexer && (
+          <form action={criarEmpresa} className="flex flex-wrap items-end gap-2">
+            <Campo nome="razao_social" rotulo="Razão social" largura="240px" obrigatorio />
+            <Campo nome="nome_curto" rotulo="Nome curto" largura="130px" obrigatorio />
+            <Campo nome="cnpj" rotulo="CNPJ" largura="150px" mono />
+            <Campo nome="serie_nfe" rotulo="Série" largura="70px" mono />
+            <Botao principal>Cadastrar empresa</Botao>
+          </form>
+        )}
       </Secao>
 
       <Secao
@@ -173,14 +183,16 @@ export async function Cadastros({ falha }: { falha?: string }) {
           </Tabela>
         )}
 
-        <form action={criarCanal} className="flex flex-wrap items-end gap-2">
-          <Campo nome="nome" rotulo="Nome" largura="180px" obrigatorio />
-          <Campo nome="slug" rotulo="Identificador" largura="150px" mono obrigatorio />
-          <Campo nome="sigla" rotulo="Sigla" largura="80px" mono />
-          <Campo nome="icone_url" rotulo="Ícone" largura="200px" dica="/canais/arquivo.svg" />
-          <Marcar nome="entra_na_esteira" rotulo="Entra na esteira" marcado />
-          <Botao principal>Cadastrar canal</Botao>
-        </form>
+        {podeMexer && (
+          <form action={criarCanal} className="flex flex-wrap items-end gap-2">
+            <Campo nome="nome" rotulo="Nome" largura="180px" obrigatorio />
+            <Campo nome="slug" rotulo="Identificador" largura="150px" mono obrigatorio />
+            <Campo nome="sigla" rotulo="Sigla" largura="80px" mono />
+            <Campo nome="icone_url" rotulo="Ícone" largura="200px" dica="/canais/arquivo.svg" />
+            <Marcar nome="entra_na_esteira" rotulo="Entra na esteira" marcado />
+            <Botao principal>Cadastrar canal</Botao>
+          </form>
+        )}
       </Secao>
 
       <Secao
@@ -213,16 +225,18 @@ export async function Cadastros({ falha }: { falha?: string }) {
             Cadastre um canal primeiro — toda modalidade pertence a um.
           </p>
         ) : (
-          <form action={criarModalidade} className="flex flex-wrap items-end gap-2">
-            <Escolher nome="canal" rotulo="Canal" opcoes={listaCanais} />
-            <Campo nome="nome" rotulo="Nome" largura="170px" obrigatorio />
-            <Campo nome="slug" rotulo="Identificador" largura="150px" mono obrigatorio />
-            <Marcar nome="gera_etiqueta" rotulo="Gera etiqueta" marcado />
-            <Marcar nome="exige_nota_antes" rotulo="Nota antes" marcado />
-            <Marcar nome="tem_janela_coleta" rotulo="Janela de coleta" />
-            <Marcar nome="entra_na_esteira" rotulo="Entra na esteira" marcado />
-            <Botao principal>Cadastrar modalidade</Botao>
-          </form>
+          podeMexer && (
+            <form action={criarModalidade} className="flex flex-wrap items-end gap-2">
+              <Escolher nome="canal" rotulo="Canal" opcoes={listaCanais} />
+              <Campo nome="nome" rotulo="Nome" largura="170px" obrigatorio />
+              <Campo nome="slug" rotulo="Identificador" largura="150px" mono obrigatorio />
+              <Marcar nome="gera_etiqueta" rotulo="Gera etiqueta" marcado />
+              <Marcar nome="exige_nota_antes" rotulo="Nota antes" marcado />
+              <Marcar nome="tem_janela_coleta" rotulo="Janela de coleta" />
+              <Marcar nome="entra_na_esteira" rotulo="Entra na esteira" marcado />
+              <Botao principal>Cadastrar modalidade</Botao>
+            </form>
+          )
         )}
       </Secao>
 
@@ -257,26 +271,28 @@ export async function Cadastros({ falha }: { falha?: string }) {
             Cadastre uma modalidade primeiro.
           </p>
         ) : (
-          <form action={definirCusto} className="flex flex-wrap items-end gap-2">
-            <Escolher nome="modalidade" rotulo="Modalidade" opcoes={listaModalidades} />
-            <Campo nome="valor" rotulo="Valor" largura="110px" mono dica="ex.: 11,99" obrigatorio />
-            <div>
-              <label
-                htmlFor="cad-vigente"
-                className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
-              >
-                Vigente a partir de
-              </label>
-              <input
-                id="cad-vigente"
-                name="vigente_de"
-                type="date"
-                defaultValue={new Date().toISOString().slice(0, 10)}
-                className="rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
-              />
-            </div>
-            <Botao principal>Definir valor</Botao>
-          </form>
+          podeMexer && (
+            <form action={definirCusto} className="flex flex-wrap items-end gap-2">
+              <Escolher nome="modalidade" rotulo="Modalidade" opcoes={listaModalidades} />
+              <Campo nome="valor" rotulo="Valor" largura="110px" mono dica="ex.: 11,99" obrigatorio />
+              <div>
+                <label
+                  htmlFor="cad-vigente"
+                  className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+                >
+                  Vigente a partir de
+                </label>
+                <input
+                  id="cad-vigente"
+                  name="vigente_de"
+                  type="date"
+                  defaultValue={new Date().toISOString().slice(0, 10)}
+                  className="rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
+                />
+              </div>
+              <Botao principal>Definir valor</Botao>
+            </form>
+          )
         )}
       </Secao>
     </div>

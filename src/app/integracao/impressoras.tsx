@@ -1,3 +1,4 @@
+import { permissoesDeAgora } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Botao } from "@/components/botao";
 import {
@@ -45,6 +46,11 @@ type Bancada = { id: string; nome: string };
  */
 export async function Impressoras({ falha }: { falha?: string }) {
   const supabase = await criarClienteServidor();
+
+  // Quem enxerga a Integração confere como está; quem pode mexer vê os
+  // formulários. A trava de verdade está no banco — aqui é para a tela
+  // não oferecer o que o banco vai recusar.
+  const podeMexer = (await permissoesDeAgora()).has("mexer_integracao");
 
   const [{ data: maq }, { data: imp }, { data: est }, { data: admin }, publicado] =
     await Promise.all([
@@ -109,15 +115,17 @@ export async function Impressoras({ falha }: { falha?: string }) {
                     instalada por {m.registrada_por}
                   </span>
                 )}
-                <form action={revogarMaquina}>
-                  <input type="hidden" name="maquina" value={m.id} />
-                  <Botao
-                    trabalhando="Removendo…"
-                    className="rounded-lg border border-critico-linha px-3 py-[6px] text-[12.5px] font-semibold text-critico"
-                  >
-                    Remover máquina
-                  </Botao>
-                </form>
+                {podeMexer && (
+                  <form action={revogarMaquina}>
+                    <input type="hidden" name="maquina" value={m.id} />
+                    <Botao
+                      trabalhando="Removendo…"
+                      className="rounded-lg border border-critico-linha px-3 py-[6px] text-[12.5px] font-semibold text-critico"
+                    >
+                      Remover máquina
+                    </Botao>
+                  </form>
+                )}
               </header>
 
               {daMaquina.length === 0 ? (
@@ -150,63 +158,65 @@ export async function Impressoras({ falha }: { falha?: string }) {
                             {i.nome_no_sistema ?? i.nome}
                           </td>
                           <td colSpan={4} className="border-b border-linha-suave px-4 py-2">
-                            <form
-                              action={ajustarImpressora}
-                              className="flex flex-wrap items-center gap-2"
-                            >
-                              <input type="hidden" name="impressora" value={i.id} />
-
-                              <select
-                                name="linguagem"
-                                defaultValue={i.linguagem}
-                                aria-label="O que esta impressora imprime"
-                                className="rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
+                            {podeMexer && (
+                              <form
+                                action={ajustarImpressora}
+                                className="flex flex-wrap items-center gap-2"
                               >
-                                <option value="zpl">Etiqueta térmica (ZPL)</option>
-                                <option value="pdf">Papel comum (PDF)</option>
-                              </select>
-
-                              <select
-                                name="ativa"
-                                defaultValue={i.ativa ? "sim" : "nao"}
-                                aria-label="Usar esta impressora"
-                                className="rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
-                              >
-                                <option value="sim">Em uso</option>
-                                <option value="nao">Não usar</option>
-                              </select>
-
-                              <select
-                                name="estacao"
-                                defaultValue={i.estacao_id ?? ""}
-                                aria-label="Bancada"
-                                className="rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
-                              >
-                                <option value="">— sem bancada —</option>
-                                {bancadas.map((b) => (
-                                  <option key={b.id} value={b.id}>
-                                    {b.nome}
-                                  </option>
-                                ))}
-                              </select>
-
-                              <input
-                                type="number"
-                                name="copias"
-                                min={1}
-                                max={10}
-                                defaultValue={i.copias}
-                                aria-label="Número de cópias"
-                                className="w-[70px] rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
-                              />
-
-                              <Botao
-                                trabalhando="Salvando…"
-                                className="rounded-lg border border-linha px-3 py-[6px] text-[12.5px] font-semibold"
-                              >
-                                Salvar
-                              </Botao>
-                            </form>
+                                <input type="hidden" name="impressora" value={i.id} />
+  
+                                <select
+                                  name="linguagem"
+                                  defaultValue={i.linguagem}
+                                  aria-label="O que esta impressora imprime"
+                                  className="rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
+                                >
+                                  <option value="zpl">Etiqueta térmica (ZPL)</option>
+                                  <option value="pdf">Papel comum (PDF)</option>
+                                </select>
+  
+                                <select
+                                  name="ativa"
+                                  defaultValue={i.ativa ? "sim" : "nao"}
+                                  aria-label="Usar esta impressora"
+                                  className="rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
+                                >
+                                  <option value="sim">Em uso</option>
+                                  <option value="nao">Não usar</option>
+                                </select>
+  
+                                <select
+                                  name="estacao"
+                                  defaultValue={i.estacao_id ?? ""}
+                                  aria-label="Bancada"
+                                  className="rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
+                                >
+                                  <option value="">— sem bancada —</option>
+                                  {bancadas.map((b) => (
+                                    <option key={b.id} value={b.id}>
+                                      {b.nome}
+                                    </option>
+                                  ))}
+                                </select>
+  
+                                <input
+                                  type="number"
+                                  name="copias"
+                                  min={1}
+                                  max={10}
+                                  defaultValue={i.copias}
+                                  aria-label="Número de cópias"
+                                  className="w-[70px] rounded-lg border border-linha bg-superficie px-2 py-[6px] text-[13px]"
+                                />
+  
+                                <Botao
+                                  trabalhando="Salvando…"
+                                  className="rounded-lg border border-linha px-3 py-[6px] text-[12.5px] font-semibold"
+                                >
+                                  Salvar
+                                </Botao>
+                              </form>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -234,21 +244,23 @@ export async function Impressoras({ falha }: { falha?: string }) {
           </p>
         )}
 
-        <form action={criarBancada} className="flex flex-wrap items-end gap-2">
-          <input
-            name="nome"
-            required
-            placeholder="nome da bancada"
-            aria-label="Nome da bancada"
-            className="w-[240px] rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
-          />
-          <Botao
-            trabalhando="Criando…"
-            className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
-          >
-            Criar bancada
-          </Botao>
-        </form>
+        {podeMexer && (
+          <form action={criarBancada} className="flex flex-wrap items-end gap-2">
+            <input
+              name="nome"
+              required
+              placeholder="nome da bancada"
+              aria-label="Nome da bancada"
+              className="w-[240px] rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
+            />
+            <Botao
+              trabalhando="Criando…"
+              className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
+            >
+              Criar bancada
+            </Botao>
+          </form>
+        )}
       </section>
 
       <AppDaBancada

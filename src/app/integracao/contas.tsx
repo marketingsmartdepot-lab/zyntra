@@ -1,3 +1,4 @@
+import { permissoesDeAgora } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { alternarEmissao, retomarEmissao } from "./contas-acoes";
 import { conectarConta } from "./ml-acoes";
@@ -33,6 +34,11 @@ type LinhaConta = {
 
 export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
   const supabase = await criarClienteServidor();
+
+  // Quem enxerga a Integração confere como está; quem pode mexer vê os
+  // formulários. A trava de verdade está no banco — aqui é para a tela
+  // não oferecer o que o banco vai recusar.
+  const podeMexer = (await permissoesDeAgora()).has("mexer_integracao");
 
   const { data, error } = await supabase
     .from("contas")
@@ -145,7 +151,7 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
                       não se aplica
                     </span>
                   ) : (
-                    <ChaveDaEmissao conta={c} pausada={pausada} />
+                    <ChaveDaEmissao conta={c} pausada={pausada} podeMexer={podeMexer} />
                   )}
                 </Celula>
                 <Celula>
@@ -177,15 +183,17 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
                           {c.ultimo_erro}
                         </div>
                       )}
-                      <form action={conectarConta} className="mt-[6px]">
-                        <input type="hidden" name="conta" value={c.id} />
-                        <Botao
-                          trabalhando="Abrindo…"
-                          className="rounded-lg border border-linha px-3 py-[6px] text-[12px] font-semibold"
-                        >
-                          Reconectar
-                        </Botao>
-                      </form>
+                      {podeMexer && (
+                        <form action={conectarConta} className="mt-[6px]">
+                          <input type="hidden" name="conta" value={c.id} />
+                          <Botao
+                            trabalhando="Abrindo…"
+                            className="rounded-lg border border-linha px-3 py-[6px] text-[12px] font-semibold"
+                          >
+                            Reconectar
+                          </Botao>
+                        </form>
+                      )}
                     </>
                   )}
                 </Celula>
@@ -208,23 +216,34 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
 function ChaveDaEmissao({
   conta,
   pausada,
+  podeMexer,
 }: {
   conta: LinhaConta;
   pausada: boolean;
+  /** Sem isto o estado aparece, o botão não. */
+  podeMexer: boolean;
 }) {
+  const estado = conta.emissao_automatica ? (
+    <Selo tom="ok">Ligada</Selo>
+  ) : (
+    <Selo tom="neutro">Desligada</Selo>
+  );
+
   if (pausada) {
     return (
       <div>
         <Selo tom="critico">Pausada pelo disjuntor</Selo>
-        <form action={retomarEmissao} className="mt-[6px]">
-          <input type="hidden" name="conta" value={conta.id} />
-          <button
-            type="submit"
-            className="rounded-lg border border-critico-linha px-3 py-[6px] text-[12px] font-semibold text-critico"
-          >
-            Retomar emissão
-          </button>
-        </form>
+        {podeMexer && (
+          <form action={retomarEmissao} className="mt-[6px]">
+            <input type="hidden" name="conta" value={conta.id} />
+            <button
+              type="submit"
+              className="rounded-lg border border-critico-linha px-3 py-[6px] text-[12px] font-semibold text-critico"
+            >
+              Retomar emissão
+            </button>
+          </form>
+        )}
         <p className="m-0 mt-[5px] max-w-[30ch] text-[11px] text-suave">
           Conserte a causa antes. Retomar sem consertar faz a conta pausar de
           novo em minutos.
@@ -232,6 +251,10 @@ function ChaveDaEmissao({
       </div>
     );
   }
+
+  // Quem só enxerga a Integração vê como a conta está, e nada mais. O selo
+  // sozinho é a informação; o botão é a ação.
+  if (!podeMexer) return estado;
 
   return (
     <form action={alternarEmissao} className="flex items-center gap-2">
@@ -241,26 +264,21 @@ function ChaveDaEmissao({
         name="ligar"
         value={conta.emissao_automatica ? "0" : "1"}
       />
+      {estado}
       {conta.emissao_automatica ? (
-        <>
-          <Selo tom="ok">Ligada</Selo>
-          <button
-            type="submit"
-            className="rounded-lg border border-linha px-3 py-[6px] text-[12px] font-semibold text-suave"
-          >
-            Desligar
-          </button>
-        </>
+        <button
+          type="submit"
+          className="rounded-lg border border-linha px-3 py-[6px] text-[12px] font-semibold text-suave"
+        >
+          Desligar
+        </button>
       ) : (
-        <>
-          <Selo tom="neutro">Desligada</Selo>
-          <button
-            type="submit"
-            className="rounded-lg bg-tinta px-3 py-[6px] text-[12px] font-semibold text-white"
-          >
-            Ligar
-          </button>
-        </>
+        <button
+          type="submit"
+          className="rounded-lg bg-tinta px-3 py-[6px] text-[12px] font-semibold text-white"
+        >
+          Ligar
+        </button>
       )}
     </form>
   );

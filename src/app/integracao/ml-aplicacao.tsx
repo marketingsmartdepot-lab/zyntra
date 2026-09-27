@@ -1,3 +1,4 @@
+import { permissoesDeAgora } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Botao } from "@/components/botao";
 import { salvarAplicacaoMl, conectarConta } from "./ml-acoes";
@@ -13,6 +14,11 @@ import { salvarAplicacaoMl, conectarConta } from "./ml-acoes";
  */
 export async function AplicacaoMl({ origem }: { origem: string }) {
   const supabase = await criarClienteServidor();
+
+  // Quem enxerga a Integração confere como está; quem pode mexer vê os
+  // formulários. A trava de verdade está no banco — aqui é para a tela
+  // não oferecer o que o banco vai recusar.
+  const podeMexer = (await permissoesDeAgora()).has("mexer_integracao");
   const { data } = await supabase.rpc("aplicacao_ml");
   const app = (Array.isArray(data) ? data[0] : data) as
     | { configurada: boolean; client_id: string | null; redirect_uri: string | null; usa_pkce: boolean }
@@ -70,59 +76,61 @@ export async function AplicacaoMl({ origem }: { origem: string }) {
             </p>
           </div>
 
-          <form action={salvarAplicacaoMl} className="mt-4 flex flex-col gap-3">
-            <input type="hidden" name="redirect_uri" value={retorno} />
-
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-suave">
-                Client ID
-              </span>
-              <input
-                name="client_id"
-                required
-                defaultValue={app?.client_id ?? ""}
-                placeholder="1234567890123456"
-                className="w-[340px] max-w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13.5px]"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-suave">
-                Client Secret
-              </span>
-              <input
-                name="client_secret"
-                type="password"
-                required
-                autoComplete="off"
-                placeholder={pronto ? "•••••••• (mande de novo para trocar)" : ""}
-                className="w-[340px] max-w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13.5px]"
-              />
-              <span className="text-[12px] text-suave">
-                Fica guardada fora do alcance do navegador e não volta em leitura
-                nenhuma. Para trocar, mande a nova.
-              </span>
-            </label>
-
-            <label className="flex items-center gap-2 text-[13px]">
-              <input
-                type="checkbox"
-                name="usa_pkce"
-                defaultChecked={app?.usa_pkce ?? false}
-                className="h-4 w-4"
-              />
-              Marquei &ldquo;Usar PKCE&rdquo; ao criar o aplicativo
-            </label>
-
-            <div>
-              <Botao
-                trabalhando="Salvando…"
-                className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
-              >
-                {pronto ? "Trocar credenciais" : "Salvar credenciais"}
-              </Botao>
-            </div>
-          </form>
+          {podeMexer && (
+            <form action={salvarAplicacaoMl} className="mt-4 flex flex-col gap-3">
+              <input type="hidden" name="redirect_uri" value={retorno} />
+  
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-suave">
+                  Client ID
+                </span>
+                <input
+                  name="client_id"
+                  required
+                  defaultValue={app?.client_id ?? ""}
+                  placeholder="1234567890123456"
+                  className="w-[340px] max-w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13.5px]"
+                />
+              </label>
+  
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-suave">
+                  Client Secret
+                </span>
+                <input
+                  name="client_secret"
+                  type="password"
+                  required
+                  autoComplete="off"
+                  placeholder={pronto ? "•••••••• (mande de novo para trocar)" : ""}
+                  className="w-[340px] max-w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13.5px]"
+                />
+                <span className="text-[12px] text-suave">
+                  Fica guardada fora do alcance do navegador e não volta em leitura
+                  nenhuma. Para trocar, mande a nova.
+                </span>
+              </label>
+  
+              <label className="flex items-center gap-2 text-[13px]">
+                <input
+                  type="checkbox"
+                  name="usa_pkce"
+                  defaultChecked={app?.usa_pkce ?? false}
+                  className="h-4 w-4"
+                />
+                Marquei &ldquo;Usar PKCE&rdquo; ao criar o aplicativo
+              </label>
+  
+              <div>
+                <Botao
+                  trabalhando="Salvando…"
+                  className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
+                >
+                  {pronto ? "Trocar credenciais" : "Salvar credenciais"}
+                </Botao>
+              </div>
+            </form>
+          )}
         </div>
       </section>
 

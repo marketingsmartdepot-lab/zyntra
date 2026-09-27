@@ -15,7 +15,14 @@ export type SaidaResumo = {
   na_doca: number;
 };
 
-export function EstacaoDeSaida({ saidas }: { saidas: SaidaResumo[] }) {
+export function EstacaoDeSaida({
+  saidas,
+  veValores,
+}: {
+  saidas: SaidaResumo[];
+  /** Sem isto o total de cada saída não aparece. */
+  veValores: boolean;
+}) {
   const abertas = saidas.filter((s) => s.situacao === "em_andamento");
   const fechadas = saidas.filter((s) => s.situacao !== "em_andamento");
 
@@ -73,9 +80,11 @@ export function EstacaoDeSaida({ saidas }: { saidas: SaidaResumo[] }) {
                   </span>
                 )}
                 <span className="flex-1" />
-                <span className="font-mono font-semibold tabular-nums">
-                  {moeda(s.total)}
-                </span>
+                {veValores && (
+                  <span className="font-mono font-semibold tabular-nums">
+                    {moeda(s.total)}
+                  </span>
+                )}
                 {s.fechada_em && (
                   <span className="text-suave">
                     fechada {hora(s.fechada_em)}

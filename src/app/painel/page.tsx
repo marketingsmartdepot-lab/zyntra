@@ -1,3 +1,4 @@
+import { permissoesDeAgora } from "@/lib/permissoes";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Casca } from "@/components/casca";
@@ -47,6 +48,11 @@ export default async function PaginaPainel({
   searchParams: Promise<{ dias?: string }>;
 }) {
   const supabase = await criarClienteServidor();
+
+  // O Painel mistura duas coisas: quanto entrou e quanto trabalho existe. Quem
+  // não tem "Valores e custos" fica com a segunda — pedidos, unidades, etapas —
+  // e o dinheiro simplesmente não aparece.
+  const veValores = (await permissoesDeAgora()).has("ver_valores");
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -166,13 +172,15 @@ export default async function PaginaPainel({
         )}
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Numero
-            rotulo="Faturamento"
-            valor={moeda(r?.faturamento ?? 0)}
-            antes={Number(r?.faturamento ?? 0)}
-            base={Number(r?.faturamento_antes ?? 0)}
-            dias={dias}
-          />
+          {veValores && (
+            <Numero
+              rotulo="Faturamento"
+              valor={moeda(r?.faturamento ?? 0)}
+              antes={Number(r?.faturamento ?? 0)}
+              base={Number(r?.faturamento_antes ?? 0)}
+              dias={dias}
+            />
+          )}
           <Numero
             rotulo="Pedidos"
             valor={String(r?.pedidos ?? 0)}
@@ -180,13 +188,15 @@ export default async function PaginaPainel({
             base={r?.pedidos_antes ?? 0}
             dias={dias}
           />
-          <Numero
-            rotulo="Ticket médio"
-            valor={moeda(r?.ticket ?? 0)}
-            antes={Number(r?.ticket ?? 0)}
-            base={Number(r?.ticket_antes ?? 0)}
-            dias={dias}
-          />
+          {veValores && (
+            <Numero
+              rotulo="Ticket médio"
+              valor={moeda(r?.ticket ?? 0)}
+              antes={Number(r?.ticket ?? 0)}
+              base={Number(r?.ticket_antes ?? 0)}
+              dias={dias}
+            />
+          )}
           <div className="rounded-[10px] border border-linha bg-superficie px-4 py-[14px]">
             <Rotulo>Unidades</Rotulo>
             <div className="mt-[6px] font-mono text-[26px] font-semibold tracking-[-0.03em] tabular-nums">
@@ -210,7 +220,7 @@ export default async function PaginaPainel({
             </span>
             <MelhorDia dias={grafico} />
           </div>
-          <GraficoDeVendas dias={grafico} />
+          {veValores && <GraficoDeVendas dias={grafico} />}
         </section>
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -257,9 +267,11 @@ export default async function PaginaPainel({
                     <span className="w-[54px] text-right font-mono text-[14px] font-semibold tabular-nums">
                       {m.unidades}
                     </span>
-                    <span className="hidden w-[86px] text-right font-mono text-[12.5px] tabular-nums text-suave sm:block">
-                      {moeda(m.receita)}
-                    </span>
+                    {veValores && (
+                      <span className="hidden w-[86px] text-right font-mono text-[12.5px] tabular-nums text-suave sm:block">
+                        {moeda(m.receita)}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

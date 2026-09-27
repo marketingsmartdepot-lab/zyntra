@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { permissoesDeAgora } from "@/lib/permissoes";
 import { AbrirImpressao } from "./imprimir";
 
 export const metadata = { title: "Lista de separação — ZYNTRA" };
@@ -45,6 +46,12 @@ export default async function FolhaDaLista({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(`/entrar?destino=/expedicao/listas/${id}/folha`);
+
+  // A folha imprime fora da casca do sistema, então carrega a própria trava:
+  // sem ela, quem não enxerga a Expedição ainda imprimiria a lista inteira
+  // digitando o endereço.
+  const pode = await permissoesDeAgora();
+  if (!pode.has("ver_expedicao")) redirect("/");
 
   const [{ data: resumo }, { data: itens }] = await Promise.all([
     supabase.from("listas_resumo").select("*").eq("id", id).maybeSingle(),

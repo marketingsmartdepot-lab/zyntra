@@ -1,3 +1,4 @@
+import { permissoesDeAgora } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import {
   alternarOperador,
@@ -30,6 +31,11 @@ const PAPEL: Record<string, string> = {
 
 export async function Operadores({ falha }: { falha?: string }) {
   const supabase = await criarClienteServidor();
+
+  // Quem enxerga a Integração confere como está; quem pode mexer vê os
+  // formulários. A trava de verdade está no banco — aqui é para a tela
+  // não oferecer o que o banco vai recusar.
+  const podeMexer = (await permissoesDeAgora()).has("mexer_integracao");
   const { data } = await supabase
     .from("operadores_situacao")
     .select("*")
@@ -101,12 +107,14 @@ export async function Operadores({ falha }: { falha?: string }) {
                       <Permissao
                         operador={o.id}
                         permissao="pode_reiniciar_conferencia"
+                        podeMexer={podeMexer}
                         ligada={o.pode_reiniciar_conferencia}
                         rotulo="Reiniciar conferência"
                       />
                       <Permissao
                         operador={o.id}
                         permissao="pode_bipar_por_sku"
+                        podeMexer={podeMexer}
                         ligada={o.pode_bipar_por_sku}
                         rotulo="Conferir digitando o SKU"
                       />
@@ -129,63 +137,69 @@ export async function Operadores({ falha }: { falha?: string }) {
                   </td>
                   <td className="border-b border-linha-suave px-4 py-3">
                     <div className="flex flex-wrap items-end gap-2">
-                      <form
-                        action={definirPin}
-                        className="flex items-end gap-[6px]"
-                      >
-                        <input type="hidden" name="operador" value={o.id} />
-                        <span>
-                          <label
-                            htmlFor={`pin-${o.id}`}
-                            className="mb-[4px] block text-[9.5px] font-semibold uppercase tracking-[0.12em] text-suave"
-                          >
-                            {o.tem_pin ? "Trocar PIN" : "Definir PIN"}
-                          </label>
-                          <input
-                            id={`pin-${o.id}`}
-                            name="pin"
-                            type="password"
-                            inputMode="numeric"
-                            autoComplete="new-password"
-                            required
-                            placeholder="4 a 8 dígitos"
-                            className="w-[112px] rounded-lg border border-linha bg-superficie px-[9px] py-[6px] font-mono text-[12.5px]"
-                          />
-                        </span>
-                        <button
-                          type="submit"
-                          className="rounded-lg border border-linha px-3 py-[6px] text-[12px] font-semibold"
+                      {podeMexer && (
+                        <form
+                          action={definirPin}
+                          className="flex items-end gap-[6px]"
                         >
-                          Salvar
-                        </button>
-                      </form>
-
-                      {o.bloqueado && (
-                        <form action={destravarOperador}>
                           <input type="hidden" name="operador" value={o.id} />
+                          <span>
+                            <label
+                              htmlFor={`pin-${o.id}`}
+                              className="mb-[4px] block text-[9.5px] font-semibold uppercase tracking-[0.12em] text-suave"
+                            >
+                              {o.tem_pin ? "Trocar PIN" : "Definir PIN"}
+                            </label>
+                            <input
+                              id={`pin-${o.id}`}
+                              name="pin"
+                              type="password"
+                              inputMode="numeric"
+                              autoComplete="new-password"
+                              required
+                              placeholder="4 a 8 dígitos"
+                              className="w-[112px] rounded-lg border border-linha bg-superficie px-[9px] py-[6px] font-mono text-[12.5px]"
+                            />
+                          </span>
                           <button
                             type="submit"
-                            className="rounded-lg border border-critico-linha px-3 py-[6px] text-[12px] font-semibold text-critico"
+                            className="rounded-lg border border-linha px-3 py-[6px] text-[12px] font-semibold"
                           >
-                            Destravar
+                            Salvar
                           </button>
                         </form>
                       )}
 
-                      <form action={alternarOperador}>
-                        <input type="hidden" name="operador" value={o.id} />
-                        <input
-                          type="hidden"
-                          name="ativo"
-                          value={o.ativo ? "0" : "1"}
-                        />
-                        <button
-                          type="submit"
-                          className="rounded-lg border border-linha px-3 py-[6px] text-[12px] font-semibold text-suave"
-                        >
-                          {o.ativo ? "Desativar" : "Reativar"}
-                        </button>
-                      </form>
+                      {o.bloqueado && (
+                        podeMexer && (
+                          <form action={destravarOperador}>
+                            <input type="hidden" name="operador" value={o.id} />
+                            <button
+                              type="submit"
+                              className="rounded-lg border border-critico-linha px-3 py-[6px] text-[12px] font-semibold text-critico"
+                            >
+                              Destravar
+                            </button>
+                          </form>
+                        )
+                      )}
+
+                      {podeMexer && (
+                        <form action={alternarOperador}>
+                          <input type="hidden" name="operador" value={o.id} />
+                          <input
+                            type="hidden"
+                            name="ativo"
+                            value={o.ativo ? "0" : "1"}
+                          />
+                          <button
+                            type="submit"
+                            className="rounded-lg border border-linha px-3 py-[6px] text-[12px] font-semibold text-suave"
+                          >
+                            {o.ativo ? "Desativar" : "Reativar"}
+                          </button>
+                        </form>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -203,54 +217,56 @@ export async function Operadores({ falha }: { falha?: string }) {
         </p>
       )}
 
-      <form
-        action={criarOperador}
-        className="max-w-[420px] rounded-[9px] border border-linha px-4 py-[14px]"
-      >
-        <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em]">
-          Cadastrar operador
-        </h3>
-        <p className="mb-3 mt-1 text-[12.5px] text-suave">
-          Só líder ou administrador cadastra. O PIN é definido depois, na
-          linha dele.
-        </p>
-
-        <label
-          htmlFor="op-nome"
-          className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+      {podeMexer && (
+        <form
+          action={criarOperador}
+          className="max-w-[420px] rounded-[9px] border border-linha px-4 py-[14px]"
         >
-          Nome
-        </label>
-        <input
-          id="op-nome"
-          name="nome"
-          required
-          className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
-        />
-
-        <label
-          htmlFor="op-papel"
-          className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
-        >
-          Papel
-        </label>
-        <select
-          id="op-papel"
-          name="papel"
-          defaultValue="operador"
-          className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
-        >
-          <option value="operador">Operador — bipa na bancada</option>
-          <option value="lider">Líder — também libera divergência</option>
-        </select>
-
-        <button
-          type="submit"
-          className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
-        >
-          Cadastrar operador
-        </button>
-      </form>
+          <h3 className="m-0 text-[14px] font-bold tracking-[-0.01em]">
+            Cadastrar operador
+          </h3>
+          <p className="mb-3 mt-1 text-[12.5px] text-suave">
+            Só líder ou administrador cadastra. O PIN é definido depois, na
+            linha dele.
+          </p>
+  
+          <label
+            htmlFor="op-nome"
+            className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+          >
+            Nome
+          </label>
+          <input
+            id="op-nome"
+            name="nome"
+            required
+            className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
+          />
+  
+          <label
+            htmlFor="op-papel"
+            className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+          >
+            Papel
+          </label>
+          <select
+            id="op-papel"
+            name="papel"
+            defaultValue="operador"
+            className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
+          >
+            <option value="operador">Operador — bipa na bancada</option>
+            <option value="lider">Líder — também libera divergência</option>
+          </select>
+  
+          <button
+            type="submit"
+            className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
+          >
+            Cadastrar operador
+          </button>
+        </form>
+      )}
     </div>
   );
 }
@@ -315,39 +331,56 @@ function Permissao({
   permissao,
   ligada,
   rotulo,
+  podeMexer,
 }: {
   operador: string;
   permissao: string;
   ligada: boolean;
   rotulo: string;
+  /** Sem isto a marcação aparece, mas não clica. */
+  podeMexer: boolean;
 }) {
+  const conteudo = (
+    <>
+      <span
+        aria-hidden
+        className={`flex h-[13px] w-[13px] shrink-0 items-center justify-center rounded-[3px] border ${
+          ligada ? "border-tinta bg-tinta text-white" : "border-linha"
+        }`}
+      >
+        {ligada && (
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round">
+            <path d="m5 13 4 4L19 7" />
+          </svg>
+        )}
+      </span>
+      {rotulo}
+    </>
+  );
+
+  const traco = `flex w-full items-center gap-[6px] rounded-md px-[6px] py-[3px] text-left text-[11.5px] ${
+    ligada ? "font-semibold text-tinta" : "text-suave"
+  }`;
+
+  // Quem só enxerga a Integração lê o que cada operador da bancada pode; quem
+  // pode mexer clica. A marcação é a mesma nos dois casos de propósito — ler
+  // uma lista diferente da que o outro clica é como o time perde a confiança
+  // na tela.
+  if (!podeMexer) {
+    return (
+      <span className={traco} aria-disabled>
+        {conteudo}
+      </span>
+    );
+  }
+
   return (
     <form action={alternarPermissao}>
       <input type="hidden" name="operador" value={operador} />
       <input type="hidden" name="permissao" value={permissao} />
       <input type="hidden" name="ligar" value={ligada ? "0" : "1"} />
-      <button
-        type="submit"
-        aria-pressed={ligada}
-        className={`flex w-full items-center gap-[6px] rounded-md px-[6px] py-[3px] text-left text-[11.5px] ${
-          ligada ? "font-semibold text-tinta" : "text-suave"
-        }`}
-      >
-        <span
-          aria-hidden
-          className={`flex h-[13px] w-[13px] shrink-0 items-center justify-center rounded-[3px] border ${
-            ligada
-              ? "border-tinta bg-tinta text-white"
-              : "border-linha"
-          }`}
-        >
-          {ligada && (
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round">
-              <path d="m5 13 4 4L19 7" />
-            </svg>
-          )}
-        </span>
-        {rotulo}
+      <button type="submit" aria-pressed={ligada} className={traco}>
+        {conteudo}
       </button>
     </form>
   );

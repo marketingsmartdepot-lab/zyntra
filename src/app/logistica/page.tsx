@@ -1,3 +1,4 @@
+import { permissoesDeAgora } from "@/lib/permissoes";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Casca } from "@/components/casca";
@@ -33,6 +34,11 @@ export default async function PaginaLogistica({
   }>;
 }) {
   const supabase = await criarClienteServidor();
+
+  // Fechamento é uma aba de dinheiro e nada mais — é o custo do Flex no mês.
+  // Sem "Valores e custos" ela nem aparece na faixa: aba que abre e diz "não
+  // pode" é pior que aba que não existe.
+  const veValores = (await permissoesDeAgora()).has("ver_valores");
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -46,9 +52,10 @@ export default async function PaginaLogistica({
     falha,
     fechada,
   } = await searchParams;
-  const aba: Aba = ABAS.some((a) => a.chave === pedida)
-    ? (pedida as Aba)
-    : "doca";
+  // Fechamento pedido por quem não enxerga valores cai na Doca, não numa tela
+  // branca: quem chegou por um link antigo precisa de um lugar para ficar.
+  const pediu = ABAS.some((a) => a.chave === pedida) ? (pedida as Aba) : "doca";
+  const aba: Aba = pediu === "fechamento" && !veValores ? "doca" : pediu;
 
   const [{ data: destinos }, { data: saidas }, { data: entregas }] =
     await Promise.all([
@@ -121,15 +128,19 @@ export default async function PaginaLogistica({
             contagem: abertas.length,
             ativa: aba === "saida",
           },
-          {
-            chave: "fechamento",
-            href: "/logistica?aba=fechamento",
-            rotulo: "Fechamento",
-            // Fechamento não conta pacote: conta mês.
-            legenda: mesAtual().toLowerCase(),
-            ativa: aba === "fechamento",
-            separadaAntes: true,
-          },
+          ...(veValores
+            ? [
+                {
+                  chave: "fechamento",
+                  href: "/logistica?aba=fechamento",
+                  rotulo: "Fechamento",
+                  // Fechamento não conta pacote: conta mês.
+                  legenda: mesAtual().toLowerCase(),
+                  ativa: aba === "fechamento",
+                  separadaAntes: true,
+                },
+              ]
+            : []),
         ]}
         direita={
           <Indicador
@@ -185,6 +196,7 @@ export default async function PaginaLogistica({
             <Doca
               destinos={destinos ?? []}
               entregas={(entregas ?? []) as EntregaResumo[]}
+              veValores={veValores}
             />
           ))}
         {aba === "saida" &&
@@ -197,9 +209,10 @@ export default async function PaginaLogistica({
               totalInicial={Number(naBancada.total)}
               aindaNaDoca={naBancada.na_doca}
               operadorId={turno?.operadorId ?? null}
+              veValores={veValores}
             />
           ) : (
-            <EstacaoDeSaida saidas={saidas ?? []} />
+            <EstacaoDeSaida saidas={saidas ?? []} veValores={veValores} />
           ))}
         {aba === "fechamento" && <Fechamento />}
       </div>

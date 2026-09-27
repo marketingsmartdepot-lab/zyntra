@@ -2,6 +2,7 @@ import Link from "next/link";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Botao } from "@/components/botao";
 import { buscarEans, excluirSkus, sincronizarCatalogo } from "./acoes";
+import { permissoesDeAgora } from "@/lib/permissoes";
 
 type Resumo = {
   total: number;
@@ -48,6 +49,11 @@ export async function ListaCatalogo({
   numeros: Record<string, string | undefined>;
 }) {
   const supabase = await criarClienteServidor();
+
+  // Quem só enxerga o catálogo consulta; quem pode mexer vê os botões. A trava
+  // de verdade está no banco — aqui é para a tela não oferecer o que o banco
+  // vai recusar.
+  const podeMexer = (await permissoesDeAgora()).has("mexer_catalogo");
 
   const n = Math.max(Number(pagina ?? 1) || 1, 1);
   const termo = (busca ?? "").trim();
@@ -119,6 +125,7 @@ export async function ListaCatalogo({
               </>
             )}
           </p>
+          {podeMexer && (
           <form action={buscarEans} className="mt-2 flex items-center gap-3">
             <Botao
               trabalhando="Consultando o Bling…"
@@ -132,6 +139,7 @@ export async function ListaCatalogo({
               detalhe de cada produto.
             </span>
           </form>
+          )}
         </div>
       )}
 
@@ -169,14 +177,16 @@ export async function ListaCatalogo({
 
         <span className="flex-1" />
 
-        <form action={sincronizarCatalogo}>
-          <Botao
-            trabalhando="Trazendo o catálogo…"
-            className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
-          >
-            Sincronizar com o Bling
-          </Botao>
-        </form>
+        {podeMexer && (
+          <form action={sincronizarCatalogo}>
+            <Botao
+              trabalhando="Trazendo o catálogo…"
+              className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
+            >
+              Sincronizar com o Bling
+            </Botao>
+          </form>
+        )}
       </div>
 
       {resumo?.ultima_sincronizacao && (
@@ -231,13 +241,15 @@ export async function ListaCatalogo({
                   return (
                     <tr key={l.id} className="hover:bg-fundo">
                       <td className="border-b border-linha-suave px-4 py-2">
-                        <input
-                          type="checkbox"
-                          name="sku"
-                          value={l.id}
-                          aria-label={`Selecionar ${l.codigo}`}
-                          className="accent-[var(--color-tinta)]"
-                        />
+                        {podeMexer && (
+                          <input
+                            type="checkbox"
+                            name="sku"
+                            value={l.id}
+                            aria-label={`Selecionar ${l.codigo}`}
+                            className="accent-[var(--color-tinta)]"
+                          />
+                        )}
                       </td>
                       <td className="border-b border-linha-suave px-4 py-2">
                         {l.foto_url ? (
@@ -289,17 +301,21 @@ export async function ListaCatalogo({
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Botao
-              trabalhando="Apagando…"
-              className="rounded-lg border border-critico-linha px-4 py-[9px] text-[13px] font-semibold text-critico"
-            >
-              Apagar selecionados
-            </Botao>
-            <span className="max-w-[64ch] text-[12.5px] text-suave">
-              Apaga de vez. Produto que já passou por conferência, baixa, anúncio
-              ou kit é recusado pelo banco — esse volta nomeado, porque apagá-lo
-              deixaria o histórico sem explicação.
-            </span>
+            {podeMexer && (
+              <>
+                <Botao
+                  trabalhando="Apagando…"
+                  className="rounded-lg border border-critico-linha px-4 py-[9px] text-[13px] font-semibold text-critico"
+                >
+                  Apagar selecionados
+                </Botao>
+                <span className="max-w-[64ch] text-[12.5px] text-suave">
+                  Apaga de vez. Produto que já passou por conferência, baixa,
+                  anúncio ou kit é recusado pelo banco — esse volta nomeado,
+                  porque apagá-lo deixaria o histórico sem explicação.
+                </span>
+              </>
+            )}
 
             <span className="flex-1" />
 

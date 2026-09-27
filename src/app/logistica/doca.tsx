@@ -59,9 +59,12 @@ function EntregasDoDia({ entregas }: { entregas: EntregaResumo[] }) {
 }
 
 export function Doca({
+  veValores,
   destinos,
   entregas,
 }: {
+  /** Sem isto o custo previsto não aparece. */
+  veValores: boolean;
   destinos: Destino[];
   entregas: EntregaResumo[];
 }) {
@@ -106,7 +109,7 @@ export function Doca({
 
             <span className="flex-1" />
 
-            {d.pacotes_com_custo > 0 ? (
+            {veValores && d.pacotes_com_custo > 0 ? (
               <span className="text-right">
                 <span className="font-mono text-[16px] font-semibold tabular-nums">
                   {moeda(d.custo_previsto)}

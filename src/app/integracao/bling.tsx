@@ -1,3 +1,4 @@
+import { permissoesDeAgora } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Botao } from "@/components/botao";
 import {
@@ -42,6 +43,11 @@ export async function ConexaoBling({
 }) {
   const supabase = await criarClienteServidor();
 
+  // Quem enxerga a Integração confere como está; quem pode mexer vê os
+  // formulários. A trava de verdade está no banco — aqui é para a tela
+  // não oferecer o que o banco vai recusar.
+  const podeMexer = (await permissoesDeAgora()).has("mexer_integracao");
+
   const [{ data: app }, { data: saude }] = await Promise.all([
     supabase.rpc("erp_aplicacao_resumo"),
     supabase
@@ -78,14 +84,16 @@ export async function ConexaoBling({
         )}
         <span className="flex-1" />
         {conectada && (
-          <form action={desconectarBling}>
-            <button
-              type="submit"
-              className="rounded-lg border border-linha px-3 py-[6px] text-[12.5px] font-semibold"
-            >
-              Desconectar
-            </button>
-          </form>
+          podeMexer && (
+            <form action={desconectarBling}>
+              <button
+                type="submit"
+                className="rounded-lg border border-linha px-3 py-[6px] text-[12.5px] font-semibold"
+              >
+                Desconectar
+              </button>
+            </form>
+          )
         )}
       </header>
 
@@ -136,50 +144,52 @@ export async function ConexaoBling({
             {configurada ? "Trocar as credenciais" : "Cadastrar as credenciais"}
           </summary>
 
-          <form action={salvarAplicacaoBling} className="mt-3 flex flex-wrap items-end gap-3">
-            <div>
-              <label
-                htmlFor="bling-client-id"
-                className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+          {podeMexer && (
+            <form action={salvarAplicacaoBling} className="mt-3 flex flex-wrap items-end gap-3">
+              <div>
+                <label
+                  htmlFor="bling-client-id"
+                  className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+                >
+                  Client ID
+                </label>
+                <input
+                  id="bling-client-id"
+                  name="client_id"
+                  required
+                  autoComplete="off"
+                  className="w-[280px] rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13px]"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="bling-client-secret"
+                  className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+                >
+                  Client Secret
+                </label>
+                <input
+                  id="bling-client-secret"
+                  name="client_secret"
+                  type="password"
+                  required
+                  autoComplete="off"
+                  className="w-[280px] rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13px]"
+                />
+              </div>
+              <Botao
+                trabalhando="Guardando…"
+                className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
               >
-                Client ID
-              </label>
-              <input
-                id="bling-client-id"
-                name="client_id"
-                required
-                autoComplete="off"
-                className="w-[280px] rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13px]"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="bling-client-secret"
-                className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
-              >
-                Client Secret
-              </label>
-              <input
-                id="bling-client-secret"
-                name="client_secret"
-                type="password"
-                required
-                autoComplete="off"
-                className="w-[280px] rounded-lg border border-linha bg-superficie px-3 py-[9px] font-mono text-[13px]"
-              />
-            </div>
-            <Botao
-              trabalhando="Guardando…"
-              className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
-            >
-              Guardar
-            </Botao>
-            <span className="max-w-[46ch] text-[12.5px] text-suave">
-              O secret vai direto para o banco e não volta para nenhuma tela.
-              Trocar o aplicativo apaga a autorização atual — token de um app
-              não serve para outro.
-            </span>
-          </form>
+                Guardar
+              </Botao>
+              <span className="max-w-[46ch] text-[12.5px] text-suave">
+                O secret vai direto para o banco e não volta para nenhuma tela.
+                Trocar o aplicativo apaga a autorização atual — token de um app
+                não serve para outro.
+              </span>
+            </form>
+          )}
         </details>
       </div>
 
@@ -216,15 +226,17 @@ export async function ConexaoBling({
           </p>
         )}
 
-        <form action={conectarBling} className="mt-3">
-          <Botao
-            disabled={!configurada}
-            trabalhando="Levando você ao Bling…"
-            className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {conectada ? "Autorizar de novo" : "Conectar o Bling"}
-          </Botao>
-        </form>
+        {podeMexer && (
+          <form action={conectarBling} className="mt-3">
+            <Botao
+              disabled={!configurada}
+              trabalhando="Levando você ao Bling…"
+              className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {conectada ? "Autorizar de novo" : "Conectar o Bling"}
+            </Botao>
+          </form>
+        )}
 
         {!configurada && (
           <p className="mt-2 text-[12.5px] text-suave">

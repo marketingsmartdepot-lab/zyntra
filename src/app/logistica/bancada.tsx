@@ -36,6 +36,7 @@ export function BancadaDeSaida({
   totalInicial,
   aindaNaDoca,
   operadorId,
+  veValores,
 }: {
   saidaId: string;
   codigo: string;
@@ -45,6 +46,8 @@ export function BancadaDeSaida({
   aindaNaDoca: number;
   /** Quem está em turno. Cada bipe fica no nome dele. */
   operadorId: string | null;
+  /** Sem isto o custo do Flex não aparece na bancada. */
+  veValores: boolean;
 }) {
   const campo = useRef<HTMLInputElement>(null);
   const [lido, setLido] = useState("");
@@ -153,7 +156,7 @@ export function BancadaDeSaida({
         </p>
       )}
 
-      {ultima && <Resposta retorno={ultima} />}
+      {ultima && <Resposta retorno={ultima} veValores={veValores} />}
 
       <div className="flex flex-wrap gap-3">
         <Tile rotulo="Bipados nesta saída" valor={String(jaBipados + bipadosAgora)} />
@@ -162,12 +165,14 @@ export function BancadaDeSaida({
           valor={String(faltam)}
           nota={faltam > 0 ? "esperando bipe" : "nada pendente"}
         />
-        <Tile
-          rotulo="Acumulado"
-          valor={moeda(total)}
-          destaque
-          nota="congelado no instante do bipe"
-        />
+        {veValores && (
+          <Tile
+            rotulo="Acumulado"
+            valor={moeda(total)}
+            destaque
+            nota="congelado no instante do bipe"
+          />
+        )}
       </div>
 
       {linhas.length > 0 && (
@@ -184,9 +189,11 @@ export function BancadaDeSaida({
                 <span className="font-mono font-semibold">{l.codigo}</span>
                 <span className="text-suave">{l.em}</span>
                 <span className="flex-1" />
-                <span className="font-mono font-semibold tabular-nums">
-                  {l.custo > 0 ? moeda(l.custo) : "sem custo"}
-                </span>
+                {veValores && (
+                  <span className="font-mono font-semibold tabular-nums">
+                    {l.custo > 0 ? moeda(l.custo) : "sem custo"}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -200,8 +207,14 @@ export function BancadaDeSaida({
  * Cada recusa diz o que fazer. "Não foi possível" faz o operador bipar de novo
  * achando que o leitor falhou — e a fila para atrás dele.
  */
-function Resposta({ retorno }: { retorno: Retorno }) {
-  const { titulo, detalhe, tom } = ler(retorno);
+function Resposta({
+  retorno,
+  veValores,
+}: {
+  retorno: Retorno;
+  veValores: boolean;
+}) {
+  const { titulo, detalhe, tom } = ler(retorno, veValores);
 
   const cor =
     tom === "ok"
@@ -221,7 +234,7 @@ function Resposta({ retorno }: { retorno: Retorno }) {
   );
 }
 
-function ler(r: Retorno): {
+function ler(r: Retorno, veValores: boolean): {
   titulo: string;
   detalhe: string | null;
   tom: "ok" | "atencao" | "critico";
@@ -230,8 +243,9 @@ function ler(r: Retorno): {
     const custo = Number(r.custo ?? 0);
     return {
       titulo: "Registrado",
-      detalhe:
-        custo > 0
+      detalhe: !veValores
+        ? r.codigo
+        : custo > 0
           ? `${r.codigo} · ${moeda(custo)} de etiqueta`
           : `${r.codigo} · esta modalidade não tem custo`,
       tom: "ok",

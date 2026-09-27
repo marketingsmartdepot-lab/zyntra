@@ -11,6 +11,7 @@ export function ListaPacotes({
   vista,
   valores = [],
   filtros = {},
+  permissoes = [],
 }: {
   pacotes: LinhaPacote[];
   etapa: Etapa;
@@ -20,16 +21,25 @@ export function ListaPacotes({
   valores?: ValorDeFiltro[];
   /** Os filtros ativos, do endereço. */
   filtros?: Record<string, string | undefined>;
+  /** O que esta pessoa pode fazer. Botão que ela não pode usar não aparece. */
+  permissoes?: string[];
 }) {
   const daColuna = (c: string) => valores.filter((v) => v.coluna === c);
   const marcados = (c: string) =>
     (filtros[c] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   // Conferir fica de fora de propósito: ali é uma caixa por vez na bancada, e
   // ação em massa desfaz justamente o que a conferência existe para garantir.
-  const podeReter = ["aberto", "faturado", "separar"].includes(vista);
-  const podeListar = vista === "separar";
-  const podeDevolver = vista === "retido";
-  const selecionavel = podeReter || podeDevolver;
+  // Duas condições diferentes de propósito: a ETAPA diz se a ação faz sentido
+  // aqui, e a PERMISSÃO diz se esta pessoa a tem. Botão que aparece e volta
+  // "sem permissão" ensina o time a desconfiar da tela.
+  const liberado = (chave: string) => permissoes.includes(chave);
+  const podeReter =
+    ["aberto", "faturado", "separar"].includes(vista) && liberado("reter_pedido");
+  const podeListar = vista === "separar" && liberado("gerar_lista");
+  const podeDevolver = vista === "retido" && liberado("reter_pedido");
+  // Gerar lista também precisa de caixinha: quem tem 'gerar_lista' sem
+  // 'reter_pedido' ficaria com a tabela travada e nada para selecionar.
+  const selecionavel = podeReter || podeDevolver || podeListar;
   const agora = Date.now();
 
   const tabela = (

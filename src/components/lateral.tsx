@@ -3,21 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Logotipo, SimboloZ } from "@/components/marca";
+import { FRENTES, type Frente } from "@/lib/frentes";
 
-export type Frente =
-  | "expedicao"
-  | "logistica"
-  | "catalogo"
-  | "integracao"
-  | "painel";
-
-const FRENTES: { chave: Frente; rotulo: string; href: string }[] = [
-  { chave: "painel", rotulo: "Painel", href: "/painel" },
-  { chave: "expedicao", rotulo: "Expedição", href: "/expedicao" },
-  { chave: "logistica", rotulo: "Logística", href: "/logistica" },
-  { chave: "catalogo", rotulo: "Catálogo", href: "/catalogo" },
-  { chave: "integracao", rotulo: "Integração", href: "/integracao" },
-];
+export type { Frente };
 
 export function Lateral({
   frente,
@@ -25,10 +13,13 @@ export function Lateral({
   recolhidaInicial,
   bancada,
   turno,
+  frentesVisiveis,
 }: {
   frente: Frente;
   email: string;
   recolhidaInicial: boolean;
+  /** Quais frentes esta pessoa enxerga. Sem lista, enxerga todas. */
+  frentesVisiveis?: string[];
   /** Qual bancada é esta máquina. `null` quando ainda não foi escolhida. */
   bancada?: string | null;
   /** Quem está em turno nesta bancada. `null` quando ninguém abriu. */
@@ -74,7 +65,9 @@ export function Lateral({
       </div>
 
       <nav aria-label="Frente" className="flex flex-col gap-1 px-[10px] py-3">
-        {FRENTES.map((f) => {
+        {FRENTES.filter(
+          (f) => !frentesVisiveis || frentesVisiveis.includes(f.chave),
+        ).map((f) => {
           const ativa = f.chave === frente;
           return (
             <Link
