@@ -1,6 +1,7 @@
 import { criarClienteServidor } from "@/lib/supabase/server";
 import {
   alternarOperador,
+  alternarPermissao,
   criarOperador,
   definirPin,
   destravarOperador,
@@ -16,6 +17,8 @@ type Operador = {
   bloqueado: boolean;
   bloqueado_ate: string | null;
   em_turno_na_estacao: string | null;
+  pode_reiniciar_conferencia: boolean;
+  pode_bipar_por_sku: boolean;
 };
 
 const PAPEL: Record<string, string> = {
@@ -60,7 +63,7 @@ export async function Operadores({ falha }: { falha?: string }) {
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                {["Nome", "Papel", "PIN", "Turno", "Situação", ""].map((c) => (
+                {["Nome", "Papel", "PIN", "Turno", "Pode", "Situação", ""].map((c) => (
                   <th
                     key={c}
                     className="whitespace-nowrap border-b border-linha px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-suave"
@@ -93,6 +96,23 @@ export async function Operadores({ falha }: { falha?: string }) {
                       <span className="text-suave">—</span>
                     )}
                   </td>
+                  <td className="border-b border-linha-suave px-4 py-3">
+                    <div className="flex flex-col gap-[5px]">
+                      <Permissao
+                        operador={o.id}
+                        permissao="pode_reiniciar_conferencia"
+                        ligada={o.pode_reiniciar_conferencia}
+                        rotulo="Reiniciar conferência"
+                      />
+                      <Permissao
+                        operador={o.id}
+                        permissao="pode_bipar_por_sku"
+                        ligada={o.pode_bipar_por_sku}
+                        rotulo="Conferir digitando o SKU"
+                      />
+                    </div>
+                  </td>
+
                   <td className="border-b border-linha-suave px-4 py-3">
                     {o.bloqueado ? (
                       <>
@@ -281,5 +301,54 @@ function Selo({
     >
       {children}
     </span>
+  );
+}
+
+/**
+ * Uma permissão, ligada ou desligada num clique.
+ *
+ * O texto diz o que a pessoa passa a poder fazer, não o nome do campo: quem
+ * cadastra operador não devia precisar traduzir "pode_bipar_por_sku".
+ */
+function Permissao({
+  operador,
+  permissao,
+  ligada,
+  rotulo,
+}: {
+  operador: string;
+  permissao: string;
+  ligada: boolean;
+  rotulo: string;
+}) {
+  return (
+    <form action={alternarPermissao}>
+      <input type="hidden" name="operador" value={operador} />
+      <input type="hidden" name="permissao" value={permissao} />
+      <input type="hidden" name="ligar" value={ligada ? "0" : "1"} />
+      <button
+        type="submit"
+        aria-pressed={ligada}
+        className={`flex w-full items-center gap-[6px] rounded-md px-[6px] py-[3px] text-left text-[11.5px] ${
+          ligada ? "font-semibold text-tinta" : "text-suave"
+        }`}
+      >
+        <span
+          aria-hidden
+          className={`flex h-[13px] w-[13px] shrink-0 items-center justify-center rounded-[3px] border ${
+            ligada
+              ? "border-tinta bg-tinta text-white"
+              : "border-linha"
+          }`}
+        >
+          {ligada && (
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round">
+              <path d="m5 13 4 4L19 7" />
+            </svg>
+          )}
+        </span>
+        {rotulo}
+      </button>
+    </form>
   );
 }

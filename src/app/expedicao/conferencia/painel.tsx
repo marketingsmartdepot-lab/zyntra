@@ -171,6 +171,19 @@ async function Detalhe({
   ]);
 
   const conferencia = conferencias?.[0];
+
+  // Quem está no turno desta máquina pode zerar a conferência? A tela esconde
+  // o botão, mas quem decide é o banco — esconder não impede de chamar.
+  let podeReiniciar = false;
+  if (turno?.operadorId) {
+    const { data: op } = await supabase
+      .from("operadores_situacao")
+      .select("pode_reiniciar_conferencia")
+      .eq("id", turno.operadorId)
+      .maybeSingle();
+    podeReiniciar = (op as { pode_reiniciar_conferencia: boolean } | null)
+      ?.pode_reiniciar_conferencia === true;
+  }
   const proximo = fila.find((p) => p.id !== pacote.id)?.id ?? null;
 
   // Divergência aberta e quem pode liberar. Buscados juntos: a bancada precisa
@@ -329,6 +342,7 @@ async function Detalhe({
                 divergencia={divergencia}
                 jaLiberada={jaLiberada}
                 operadorId={turno?.operadorId ?? null}
+                podeReiniciar={podeReiniciar}
                 lideres={lideres}
                 liberacao={liberacao}
               />

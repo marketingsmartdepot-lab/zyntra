@@ -86,3 +86,28 @@ export async function destravarOperador(formData: FormData) {
 
   revalidatePath("/integracao");
 }
+
+/**
+ * Liga e desliga uma permissão de um operador.
+ *
+ * Duas, por enquanto: reiniciar conferência e conferir digitando o SKU. As
+ * duas nascem desligadas porque as duas enfraquecem uma garantia — reiniciar
+ * apaga leitura feita, digitar é prova mais fraca que bipar. Quem liga está
+ * assumindo isso de propósito.
+ */
+export async function alternarPermissao(formData: FormData) {
+  const operador = String(formData.get("operador") ?? "");
+  const permissao = String(formData.get("permissao") ?? "");
+  const ligar = String(formData.get("ligar") ?? "") === "1";
+
+  if (!operador) return;
+  if (!["pode_reiniciar_conferencia", "pode_bipar_por_sku"].includes(permissao)) return;
+
+  const supabase = await criarClienteServidor();
+  await supabase
+    .from("operadores")
+    .update({ [permissao]: ligar })
+    .eq("id", operador);
+
+  revalidatePath("/integracao");
+}

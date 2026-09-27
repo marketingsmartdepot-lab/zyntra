@@ -126,3 +126,32 @@ function traduzir(mensagem: string) {
   }
   return mensagem;
 }
+
+/**
+ * Zera uma conferência em andamento.
+ *
+ * Só quem tem a permissão liga isto — e o banco confere de novo, porque
+ * esconder o botão não impede ninguém de chamar a função.
+ *
+ * O histórico do pacote guarda quem reiniciou. Uma caixa reiniciada três
+ * vezes numa tarde é um sinal, e sinal apagado não avisa ninguém.
+ */
+export async function reiniciarConferencia(formData: FormData) {
+  const conferencia = String(formData.get("conferencia") ?? "");
+  const operador = String(formData.get("operador") ?? "");
+  const pacote = String(formData.get("pacote") ?? "");
+  if (!conferencia || !operador) return;
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc("reiniciar_conferencia", {
+    p_conferencia_id: conferencia,
+    p_operador_id: operador,
+  });
+
+  revalidatePath("/expedicao");
+
+  const r = Array.isArray(data) ? data[0] : data;
+  const resultado = error ? "erro" : r?.ok ? "reiniciada" : (r?.motivo ?? "erro");
+
+  redirect(`/expedicao?etapa=conferir&pacote=${pacote}&liberacao=${resultado}`);
+}

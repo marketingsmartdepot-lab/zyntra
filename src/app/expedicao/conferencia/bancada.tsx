@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { criarClienteNavegador } from "@/lib/supabase/client";
-import { concluirConferencia } from "./acoes";
+import { concluirConferencia, reiniciarConferencia } from "./acoes";
 import {
   AbrirDivergencia,
   LiberarDivergencia,
@@ -47,6 +47,7 @@ export function Bancada({
   divergencia,
   jaLiberada,
   operadorId,
+  podeReiniciar,
   lideres,
   liberacao,
 }: {
@@ -60,6 +61,8 @@ export function Bancada({
   jaLiberada: boolean;
   /** Quem está em turno. Cada leitura fica no nome dele. */
   operadorId: string | null;
+  /** O operador do turno pode zerar esta conferência? */
+  podeReiniciar?: boolean;
   lideres: Lider[];
   liberacao?: string;
 }) {
@@ -277,6 +280,20 @@ export function Bancada({
           fechar a conferência
         </span>
         <span className="flex-1" />
+        {podeReiniciar && operadorId && (
+          <form action={reiniciarConferencia}>
+            <input type="hidden" name="conferencia" value={conferenciaId} />
+            <input type="hidden" name="operador" value={operadorId} />
+            <input type="hidden" name="pacote" value={pacoteId} />
+            <button
+              type="submit"
+              className="rounded-lg border border-linha px-3 py-[9px] text-[12.5px] font-semibold text-suave"
+            >
+              Reiniciar conferência
+            </button>
+          </form>
+        )}
+
         {!completo && !divergencia && !jaLiberada && (
           <AbrirDivergencia conferenciaId={conferenciaId} />
         )}
