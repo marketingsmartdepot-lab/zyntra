@@ -15,7 +15,6 @@ import { permissoesDeAgora } from "@/lib/permissoes";
 import { ChamarModoBipagem } from "./modo-bipagem";
 import { EsperandoBipe } from "./conferencia/esperando-bipe";
 import { modoBipagemLigado } from "./bipagem-acoes";
-import { AbrirCarrinho } from "../logistica/abrir-carrinho";
 import { PainelDetalhe } from "./conferencia/painel";
 import { PainelListas } from "./listas/painel";
 import { AbertoPorCausa } from "./aberto";
@@ -55,6 +54,7 @@ export default async function PaginaExpedicao({
     modalidade?: string;
     nf?: string;
     etiqueta?: string;
+    separacao?: string;
     bipe?: string;
     codigo?: string;
     bipagem?: string;
@@ -90,6 +90,7 @@ export default async function PaginaExpedicao({
     modalidade,
     nf,
     etiqueta,
+    separacao,
   } = await searchParams;
   const vista: Vista = pedida && ehVista(pedida) ? pedida : "separar";
   // "listas" não é etapa: a consulta de pacotes continua olhando Separar.
@@ -132,10 +133,36 @@ export default async function PaginaExpedicao({
     p_modalidades: valoresDe(modalidade),
     p_nf: valoresDe(nf),
     p_etiqueta: valoresDe(etiqueta),
+    p_listas: valoresDe(separacao),
     p_limite: 200,
   });
 
   const ids = ((escolhidos ?? []) as { id: string }[]).map((x) => x.id);
+
+  // De qual lista de separação é cada caixa. Consulta à parte, e não embutida
+  // na de cima, porque a ligação passa por uma tabela de junção — e um erro de
+  // embutimento aqui derrubaria a esteira inteira, não só a coluna nova.
+  const { data: vinculosDeLista } =
+    ids.length === 0
+      ? { data: [] }
+      : await supabase
+          .from("listas_pacotes")
+          .select("pacote_id, listas_separacao ( codigo, operadores ( nome ) )")
+          .in("pacote_id", ids)
+          .eq("ativa", true);
+
+  const listaDoPacote = new Map<string, { codigo: string; separador: string | null }>();
+  for (const v of (vinculosDeLista ?? []) as unknown as {
+    pacote_id: string;
+    listas_separacao: { codigo: string; operadores: { nome: string } | null } | null;
+  }[]) {
+    if (v.listas_separacao) {
+      listaDoPacote.set(v.pacote_id, {
+        codigo: v.listas_separacao.codigo,
+        separador: v.listas_separacao.operadores?.nome ?? null,
+      });
+    }
+  }
 
   const { data: pacotes, error } =
     ids.length === 0
@@ -158,6 +185,7 @@ export default async function PaginaExpedicao({
     modalidade,
     nf,
     etiqueta,
+    separacao,
   };
 
   // Etapa vazia não quer dizer a mesma coisa antes e depois de haver conta.
@@ -262,6 +290,7 @@ export default async function PaginaExpedicao({
                 valores={(valoresDeFiltro ?? []) as ValorDeFiltro[]}
                 filtros={filtrosAtivos}
                 permissoes={[...pode]}
+                listas={Object.fromEntries(listaDoPacote)}
               />
             )}
           </div>
@@ -301,18 +330,8 @@ export default async function PaginaExpedicao({
               valores={(valoresDeFiltro ?? []) as ValorDeFiltro[]}
               filtros={filtrosAtivos}
               permissoes={[...pode]}
+              listas={Object.fromEntries(listaDoPacote)}
             />
-            {/* O fechamento mora aqui: quando a caixa está pronta pra envio, o
-                passo seguinte é levá-la para a doca. Mandar a pessoa trocar de
-                frente para achar o botão é pedir que ela largue a pilha. */}
-            {vista === "pronto" && (
-              <div className="mt-auto border-t border-linha bg-fundo px-5 py-3">
-                <AbrirCarrinho
-                  compacto
-                  aviso="Abre o carrinho e leva para a bancada de bipagem da doca. Caixa sem etiqueta confirmada é recusada lá."
-                />
-              </div>
-            )}
           </div>
         )}
       </div>

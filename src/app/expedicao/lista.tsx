@@ -3,6 +3,7 @@ import type { Etapa, LinhaPacote } from "@/lib/supabase/tipos";
 import { Botao } from "@/components/botao";
 import { gerarLista } from "./listas/acoes";
 import { tirarDoRetido } from "./retencao-acoes";
+import { abrirEntregaDoca } from "../logistica/acoes";
 import { FiltroColuna, type ValorDeFiltro } from "./filtro-coluna";
 import { MarcarTodos } from "./marcar-todos";
 import { ContagemSelecionada } from "./contagem-selecionada";
@@ -14,6 +15,7 @@ export function ListaPacotes({
   valores = [],
   filtros = {},
   permissoes = [],
+  listas = {},
 }: {
   pacotes: LinhaPacote[];
   etapa: Etapa;
@@ -25,6 +27,8 @@ export function ListaPacotes({
   filtros?: Record<string, string | undefined>;
   /** O que esta pessoa pode fazer. Botão que ela não pode usar não aparece. */
   permissoes?: string[];
+  /** De qual lista de separação é cada caixa, por id de pacote. */
+  listas?: Record<string, { codigo: string; separador: string | null }>;
 }) {
   const daColuna = (c: string) => valores.filter((v) => v.coluna === c);
   const marcados = (c: string) =>
@@ -37,9 +41,11 @@ export function ListaPacotes({
   const liberado = (chave: string) => permissoes.includes(chave);
   const podeListar = vista === "separar" && liberado("gerar_lista");
   const podeDevolver = vista === "retido" && liberado("reter_pedido");
-  // Reter saiu da esteira a pedido dela. Devolver fica: sem ele, o que já
-  // está em Retidos não teria como voltar.
-  const selecionavel = podeDevolver || podeListar;
+  const podeDoca = vista === "pronto";
+  // A caixinha aparece em TODA aba, a pedido dela. Nas abas que ainda não têm
+  // ação em massa ela não faz nada além de marcar — e é assim de propósito:
+  // tirar a coluna de uma aba e pôr noutra faz o time procurar onde não tem.
+  const selecionavel = true;
   const agora = Date.now();
 
   const tabela = (
@@ -56,6 +62,15 @@ export function ListaPacotes({
             <Cabecalho largura="176px">Código</Cabecalho>
             <Cabecalho largura="178px">Cliente</Cabecalho>
             <Cabecalho largura="158px">Conta</Cabecalho>
+            <Cabecalho largura="150px">
+              <FiltroColuna
+                coluna="separacao"
+                rotulo="Lista de separação"
+                valores={daColuna("separacao")}
+                selecionados={marcados("separacao")}
+                outros={filtros}
+              />
+            </Cabecalho>
             <Cabecalho largura="112px">
               <FiltroColuna
                 coluna="modalidade"
@@ -126,6 +141,21 @@ export function ListaPacotes({
                   <div className="mt-[2px] text-[11.5px] text-suave">
                     {p.contas?.empresas?.nome_curto ?? "sem empresa emissora"}
                   </div>
+                </Celula>
+
+                <Celula>
+                  {listas[p.id] ? (
+                    <>
+                      <div className="font-mono text-[12.5px] font-semibold">
+                        {listas[p.id].codigo}
+                      </div>
+                      <div className="mt-[2px] truncate text-[11.5px] text-suave">
+                        {listas[p.id].separador ?? "sem separador"}
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-[12px] text-suave">—</span>
+                  )}
                 </Celula>
 
                 <Celula>
@@ -226,6 +256,25 @@ export function ListaPacotes({
           >
             Devolver para a esteira
           </Botao>
+        )}
+
+        {podeDoca && (
+          <span className="flex items-center gap-2">
+            <input
+              id="doca-quem-pronto"
+              name="entregue_por"
+              aria-label="Quem está levando para a doca"
+              placeholder="quem empurra o carrinho"
+              className="w-[240px] rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13px]"
+            />
+            <Botao
+              formAction={abrirEntregaDoca}
+              trabalhando="Levando…"
+              className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
+            >
+              Levar para a doca
+            </Botao>
+          </span>
         )}
 
         {podeListar && (
