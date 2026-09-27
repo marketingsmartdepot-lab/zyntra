@@ -12,7 +12,8 @@ import {
 import { Barra } from "@/components/barra";
 import { ListaPacotes } from "./lista";
 import { permissoesDeAgora } from "@/lib/permissoes";
-import { ModoBipagem } from "./modo-bipagem";
+import { ChamarModoBipagem } from "./modo-bipagem";
+import { EsperandoBipe } from "./conferencia/esperando-bipe";
 import { modoBipagemLigado } from "./bipagem-acoes";
 import { AbrirCarrinho } from "../logistica/abrir-carrinho";
 import { PainelDetalhe } from "./conferencia/painel";
@@ -262,6 +263,15 @@ export default async function PaginaExpedicao({
               />
             )}
           </div>
+        ) : vista === "conferir" && !pacote && (await modoBipagemLigado()) ? (
+          /* A fila à esquerda só existe no modo bipagem. Com ele desligado,
+             Conferir continua sendo a lista de largura inteira. */
+          <EsperandoBipe
+            fila={(pacotes ?? []) as never[]}
+            bipe={bipe}
+            codigo={codigoBipado}
+            veValores={pode.has("ver_valores")}
+          />
         ) : pacote ? (
           <PainelDetalhe
             fila={(pacotes ?? []) as never[]}
@@ -281,13 +291,7 @@ export default async function PaginaExpedicao({
           <Vazio {...vazioDaEtapa(etapaAtiva, (contasConectadas ?? 0) > 0)} />
         ) : (
           <div className="flex flex-1 flex-col">
-            {vista === "conferir" && (
-              <ModoBipagem
-                ligado={await modoBipagemLigado()}
-                bipe={bipe}
-                codigo={codigoBipado}
-              />
-            )}
+            {vista === "conferir" && <ChamarModoBipagem />}
             <ListaPacotes
               pacotes={pacotes as unknown as LinhaPacote[]}
               etapa={etapaAtiva}
