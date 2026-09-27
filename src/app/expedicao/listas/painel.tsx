@@ -162,6 +162,79 @@ async function ListaAberta({
 
   const itens = (data ?? []) as Item[];
 
+  // De qual pedido e cada peca. A tabela e agrupada por SKU porque quem separa
+  // pega da prateleira por produto, mas quem monta a caixa precisa do pedido
+  // ao lado do SKU, nao la embaixo.
+  const { data: vinculos } = await supabase
+    .from("listas_pacotes")
+    .select("pacotes ( envio_id )")
+    .eq("lista_id", lista.id);
+
+  const envios = (
+    (vinculos ?? []) as unknown as { pacotes: { envio_id: string } | null }[]
+  )
+    .map((v) => v.pacotes?.envio_id)
+    .filter(Boolean) as string[];
+
+  const { data: pedidosDaLista } = await supabase
+    .from("pedidos")
+    .select("id, ref_externa, conta_id")
+    .in("envio_id", envios.length ? envios : ["-"]);
+
+  const daLista = (pedidosDaLista ?? []) as {
+    id: string;
+    ref_externa: string;
+    conta_id: string;
+  }[];
+
+  const [{ data: itensCrus }, { data: mapas }] = await Promise.all([
+    supabase
+      .from("pedido_itens")
+      .select("pedido_id, ref_anuncio, ref_variacao, sku_informado")
+      .in("pedido_id", daLista.length ? daLista.map((x) => x.id) : ["-"]),
+    supabase
+      .from("mapeamentos_anuncio")
+      .select("conta_id, ref_anuncio, ref_variacao, skus ( codigo )"),
+  ]);
+
+  // O mesmo anuncio em contas diferentes pode apontar para produtos
+  // diferentes, entao a chave leva a conta junto.
+  const mapa = new Map<string, string>();
+  for (const m of (mapas ?? []) as unknown as {
+    conta_id: string;
+    ref_anuncio: string;
+    ref_variacao: string | null;
+    skus: { codigo: string } | null;
+  }[]) {
+    if (m.skus?.codigo) {
+      mapa.set(
+        `${m.conta_id}|${m.ref_anuncio}|${m.ref_variacao ?? ""}`,
+        m.skus.codigo,
+      );
+    }
+  }
+
+  const contaDo = new Map(daLista.map((x) => [x.id, x.conta_id]));
+  const refDo = new Map(daLista.map((x) => [x.id, x.ref_externa]));
+
+  const pedidosPorSku = new Map<string, Set<string>>();
+  for (const i of (itensCrus ?? []) as {
+    pedido_id: string;
+    ref_anuncio: string;
+    ref_variacao: string | null;
+    sku_informado: string | null;
+  }[]) {
+    const conta = contaDo.get(i.pedido_id) ?? "";
+    const codigo =
+      mapa.get(`${conta}|${i.ref_anuncio}|${i.ref_variacao ?? ""}`) ??
+      i.sku_informado ??
+      "—";
+    const ref = refDo.get(i.pedido_id);
+    if (!ref) continue;
+    if (!pedidosPorSku.has(codigo)) pedidosPorSku.set(codigo, new Set());
+    pedidosPorSku.get(codigo)!.add(ref);
+  }
+
   return (
     <>
       <header className="flex flex-wrap items-center gap-4 border-b border-linha px-5 py-4">
@@ -222,18 +295,20 @@ async function ListaAberta({
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                {["SKU", "Produto", "Unidades", "Em quantos pacotes"].map(
+                {["SKU", "Pedido", "Produto", "Unidades", "Em quantos pacotes"].map(
                   (c, i) => (
                     <th
                       key={c}
                       style={
-                        i === 2
+                        i === 3
                           ? { width: "120px" }
-                          : i === 3
+                          : i === 4
                             ? { width: "180px" }
                             : i === 0
-                              ? { width: "180px" }
-                              : undefined
+                              ? { width: "170px" }
+                              : i === 1
+                                ? { width: "170px" }
+                                : undefined
                       }
                       className="border-b border-linha px-4 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-suave"
                     >
@@ -252,6 +327,22 @@ async function ListaAberta({
                     </span>
                     <span className="mt-[2px] block font-mono text-[11.5px] text-suave">
                       {i.codigo_barras ?? "sem código de barras"}
+                    </span>
+                  </td>
+                  <td className="border-b border-linha-suave px-4 py-3">
+                    <span className="flex flex-wrap gap-x-2 gap-y-[2px]">
+                      {[...(pedidosPorSku.get(i.codigo) ?? [])].length === 0 ? (
+                        <span className="text-[12.5px] text-suave">—</span>
+                      ) : (
+                        [...(pedidosPorSku.get(i.codigo) ?? [])].map((ref) => (
+                          <span
+                            key={ref}
+                            className="font-mono text-[12.5px] font-semibold tabular-nums"
+                          >
+                            {ref}
+                          </span>
+                        ))
+                      )}
                     </span>
                   </td>
                   <td className="border-b border-linha-suave px-4 py-3 text-[13.5px] font-medium">
