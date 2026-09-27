@@ -16,10 +16,8 @@ type Retorno = { ok: boolean; motivo: string; impressao_id: string | null };
  */
 export function ConfirmarEtiqueta({
   pacoteId,
-  operadorId,
 }: {
   pacoteId: string;
-  operadorId: string | null;
 }) {
   const router = useRouter();
   const campo = useRef<HTMLInputElement>(null);
@@ -44,11 +42,7 @@ export function ConfirmarEtiqueta({
     const supabase = criarClienteNavegador();
     const { data, error } = await supabase.rpc(
       "confirmar_impressao_por_codigo",
-      {
-        p_pacote_id: pacoteId,
-        p_codigo: lido,
-        p_operador_id: operadorId,
-      },
+      { p_pacote_id: pacoteId, p_codigo: lido },
     );
 
     if (error) {

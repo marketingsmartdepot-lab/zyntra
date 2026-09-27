@@ -24,12 +24,10 @@ export function PainelEtiqueta({
   pacoteId,
   impressoes,
   resultado,
-  operadorId,
 }: {
   pacoteId: string;
   impressoes: ImpressaoDaEtiqueta[];
   resultado?: string;
-  operadorId: string | null;
 }) {
   const jaSaiu = impressoes.some((i) => i.situacao === "impressa");
   const naFila = impressoes.some(
@@ -101,7 +99,7 @@ export function PainelEtiqueta({
       )}
 
       {esperandoBipe && (
-        <ConfirmarEtiqueta pacoteId={pacoteId} operadorId={operadorId} />
+        <ConfirmarEtiqueta pacoteId={pacoteId} />
       )}
 
       <form

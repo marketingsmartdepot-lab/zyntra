@@ -33,11 +33,9 @@ export async function iniciarConferencia(pacoteId: string) {
 
 export async function concluirConferencia(conferenciaId: string) {
   const supabase = await criarClienteServidor();
-  const turno = await turnoDaMaquina();
 
   const { data, error } = await supabase.rpc("concluir_conferencia", {
     p_conferencia_id: conferenciaId,
-    p_operador_id: turno?.operadorId ?? null,
   });
 
   if (error) return { ok: false, mensagem: traduzir(error.message) };
@@ -72,13 +70,15 @@ export async function abrirDivergencia(formData: FormData) {
   if (!conferenciaId || !tipo) return;
 
   const supabase = await criarClienteServidor();
-  const turno = await turnoDaMaquina();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   await supabase.from("divergencias").insert({
     conferencia_id: conferenciaId,
     tipo,
     detalhe: detalhe || null,
-    aberta_por: turno?.operadorId ?? null,
+    aberta_por: user?.id ?? null,
   });
 
   revalidatePath("/expedicao");
@@ -138,14 +138,12 @@ function traduzir(mensagem: string) {
  */
 export async function reiniciarConferencia(formData: FormData) {
   const conferencia = String(formData.get("conferencia") ?? "");
-  const operador = String(formData.get("operador") ?? "");
   const pacote = String(formData.get("pacote") ?? "");
-  if (!conferencia || !operador) return;
+  if (!conferencia) return;
 
   const supabase = await criarClienteServidor();
   const { data, error } = await supabase.rpc("reiniciar_conferencia", {
     p_conferencia_id: conferencia,
-    p_operador_id: operador,
   });
 
   revalidatePath("/expedicao");

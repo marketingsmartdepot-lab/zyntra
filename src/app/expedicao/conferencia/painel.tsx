@@ -8,6 +8,7 @@ import type { DivergenciaAberta, Lider } from "./divergencia";
 import { BlocoDoPedido } from "./itens";
 import { FilaDePacotes, type PacoteNaFila } from "./fila";
 import { modoBipagemLigado } from "../bipagem-acoes";
+import { permissoesDeAgora } from "@/lib/permissoes";
 import { Anexos } from "./anexos";
 import {
   PainelEtiqueta,
@@ -123,18 +124,9 @@ async function Detalhe({
     ((comPdf as unknown as { envios: { etiqueta_pdf: string | null } | null } | null)
       ?.envios?.etiqueta_pdf ?? null) !== null;
 
-  // Quem está no turno desta máquina pode zerar a conferência? A tela esconde
-  // o botão, mas quem decide é o banco — esconder não impede de chamar.
-  let podeReiniciar = false;
-  if (turno?.operadorId) {
-    const { data: op } = await supabase
-      .from("operadores_situacao")
-      .select("pode_reiniciar_conferencia")
-      .eq("id", turno.operadorId)
-      .maybeSingle();
-    podeReiniciar = (op as { pode_reiniciar_conferencia: boolean } | null)
-      ?.pode_reiniciar_conferencia === true;
-  }
+  // Quem está LOGADO pode zerar a conferência? A tela esconde o botão, mas
+  // quem decide é o banco — esconder não impede de chamar.
+  const podeReiniciar = (await permissoesDeAgora()).has("reiniciar_conferencia");
   const proximo = fila.find((p) => p.id !== pacote.id)?.id ?? null;
 
   // Divergência aberta e quem pode liberar. Buscados juntos: a bancada precisa
@@ -279,7 +271,6 @@ async function Detalhe({
               pacoteId={pacote.id}
               impressoes={(impressoesEtiqueta ?? []) as ImpressaoDaEtiqueta[]}
               resultado={etiqueta}
-              operadorId={turno?.operadorId ?? null}
             />
           )}
 
@@ -292,8 +283,7 @@ async function Detalhe({
                 pacoteId={pacote.id}
                 divergencia={divergencia}
                 jaLiberada={jaLiberada}
-                operadorId={turno?.operadorId ?? null}
-                podeReiniciar={podeReiniciar}
+                  podeReiniciar={podeReiniciar}
                 temEtiquetaPdf={temEtiquetaPdf}
                 lideres={lideres}
                 liberacao={liberacao}

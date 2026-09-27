@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { estacaoDaMaquina, turnoDaMaquina } from "@/lib/estacao";
+import { estacaoDaMaquina } from "@/lib/estacao";
 
 /**
  * Manda a etiqueta do Mercado Livre para a impressora da bancada.
@@ -35,8 +35,6 @@ export async function imprimirEtiqueta(formData: FormData) {
 
   if (!session) return voltar("sem_sessao");
 
-  const turno = await turnoDaMaquina();
-
   let resposta: Response;
   try {
     resposta = await fetch(
@@ -50,7 +48,9 @@ export async function imprimirEtiqueta(formData: FormData) {
         body: JSON.stringify({
           pacote_id: pacoteId,
           estacao_id: estacao,
-          operador_id: turno?.operadorId ?? null,
+          // Quem mandou imprimir é o login. O PIN identifica só a doca e a
+          // porta, onde ninguém está com o navegador logado.
+          operador_id: session.user.id,
           motivo_reimpressao: motivoReimpressao || null,
         }),
       },

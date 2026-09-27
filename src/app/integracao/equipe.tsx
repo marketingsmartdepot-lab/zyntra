@@ -368,8 +368,6 @@ export async function Equipe({ falha }: { falha?: string }) {
                       papel={p.papel}
                       marcadas={p.permissoes ?? []}
                       possiveis={permissoes}
-                      naBancada={p.na_bancada}
-                      temPin={p.tem_pin}
                     />
                   </td>
 

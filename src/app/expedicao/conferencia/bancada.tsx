@@ -46,7 +46,6 @@ export function Bancada({
   pacoteId,
   divergencia,
   jaLiberada,
-  operadorId,
   podeReiniciar,
   temEtiquetaPdf,
   lideres,
@@ -63,9 +62,7 @@ export function Bancada({
   divergencia: DivergenciaAberta | null;
   /** Já houve liberação de líder nesta conferência: pode fechar com diferença. */
   jaLiberada: boolean;
-  /** Quem está em turno. Cada leitura fica no nome dele. */
-  operadorId: string | null;
-  /** O operador do turno pode zerar esta conferência? */
+  /** Quem está logado pode zerar esta conferência? */
   podeReiniciar?: boolean;
   /** Há etiqueta em PDF guardada? Sem impressora, é o que se olha. */
   temEtiquetaPdf?: boolean;
@@ -115,7 +112,6 @@ export function Bancada({
         p_conferencia_id: conferenciaId,
         p_codigo: lido,
         p_chave_cliente: chave,
-        p_operador_id: operadorId,
       });
 
       if (!error) {
@@ -302,10 +298,9 @@ export function Bancada({
           </a>
         )}
 
-        {podeReiniciar && operadorId && (
+        {podeReiniciar && (
           <form action={reiniciarConferencia}>
             <input type="hidden" name="conferencia" value={conferenciaId} />
-            <input type="hidden" name="operador" value={operadorId} />
             <input type="hidden" name="pacote" value={pacoteId} />
             <button
               type="submit"
