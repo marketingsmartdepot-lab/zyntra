@@ -55,6 +55,74 @@ export default async function FolhaDaLista({
       .order("codigo"),
   ]);
 
+  // De qual pedido é cada peça. A tabela é agrupada por SKU porque quem separa
+  // pega da prateleira por produto, mas na hora de montar a caixa precisa
+  // saber a qual pedido cada uma pertence — senão o papel diz "pegue 3" e não
+  // diz para onde vão.
+  const { data: vinculos } = await supabase
+    .from("listas_pacotes")
+    .select("pacotes ( envio_id )")
+    .eq("lista_id", id);
+
+  const envios = ((vinculos ?? []) as unknown as { pacotes: { envio_id: string } | null }[])
+    .map((v) => v.pacotes?.envio_id)
+    .filter(Boolean) as string[];
+
+  const { data: pedidosDaLista } = await supabase
+    .from("pedidos")
+    .select("id, ref_externa, conta_id, envio_id")
+    .in("envio_id", envios.length ? envios : ["-"]);
+
+  const pedidosLista = (pedidosDaLista ?? []) as {
+    id: string;
+    ref_externa: string;
+    conta_id: string;
+    envio_id: string;
+  }[];
+
+  const [{ data: itensCrus }, { data: mapas }] = await Promise.all([
+    supabase
+      .from("pedido_itens")
+      .select("pedido_id, ref_anuncio, ref_variacao, sku_informado")
+      .in("pedido_id", pedidosLista.length ? pedidosLista.map((x) => x.id) : ["-"]),
+    supabase
+      .from("mapeamentos_anuncio")
+      .select("conta_id, ref_anuncio, ref_variacao, skus ( codigo )"),
+  ]);
+
+  const mapa = new Map<string, string>();
+  for (const m of (mapas ?? []) as unknown as {
+    conta_id: string;
+    ref_anuncio: string;
+    ref_variacao: string | null;
+    skus: { codigo: string } | null;
+  }[]) {
+    if (m.skus?.codigo) {
+      mapa.set(`${m.conta_id}|${m.ref_anuncio}|${m.ref_variacao ?? ""}`, m.skus.codigo);
+    }
+  }
+
+  const contaDo = new Map(pedidosLista.map((x) => [x.id, x.conta_id]));
+  const refDo = new Map(pedidosLista.map((x) => [x.id, x.ref_externa]));
+
+  const pedidosPorSku = new Map<string, Set<string>>();
+  for (const i of (itensCrus ?? []) as {
+    pedido_id: string;
+    ref_anuncio: string;
+    ref_variacao: string | null;
+    sku_informado: string | null;
+  }[]) {
+    const conta = contaDo.get(i.pedido_id) ?? "";
+    const codigo =
+      mapa.get(`${conta}|${i.ref_anuncio}|${i.ref_variacao ?? ""}`) ??
+      i.sku_informado ??
+      "—";
+    const ref = refDo.get(i.pedido_id);
+    if (!ref) continue;
+    if (!pedidosPorSku.has(codigo)) pedidosPorSku.set(codigo, new Set());
+    pedidosPorSku.get(codigo)!.add(ref);
+  }
+
   if (!resumo) {
     return (
       <main style={{ padding: 40, fontFamily: "system-ui", color: "#000" }}>
@@ -86,6 +154,8 @@ export default async function FolhaDaLista({
         .folha .num { text-align: right; font-variant-numeric: tabular-nums;
                       font-weight: 600; }
         .folha .cod { font-family: ui-monospace, monospace; font-weight: 600; }
+        .folha .ped { font-family: ui-monospace, monospace; font-size: 11px;
+                      line-height: 1.45; }
         .folha .ean { display: block; font-family: ui-monospace, monospace;
                       font-size: 10.5px; font-weight: 400; color: #555; }
         .folha .marcar { width: 26px; height: 18px; border: 1.2px solid #000;
@@ -123,6 +193,7 @@ export default async function FolhaDaLista({
           <tr>
             <th style={{ width: 130 }}>SKU</th>
             <th>Produto</th>
+            <th style={{ width: 190 }}>Pedido</th>
             <th style={{ width: 62 }} className="num">Unid.</th>
             <th style={{ width: 74 }} className="num">Pacotes</th>
             <th style={{ width: 40 }}>Ok</th>
@@ -136,6 +207,9 @@ export default async function FolhaDaLista({
                 {li.codigo_barras && <span className="ean">{li.codigo_barras}</span>}
               </td>
               <td>{li.descricao ?? "Produto sem descrição"}</td>
+              <td className="ped">
+                {[...(pedidosPorSku.get(li.codigo) ?? [])].join(" · ") || "—"}
+              </td>
               <td className="num">{li.unidades}</td>
               <td className="num">{li.pacotes}</td>
               <td>
