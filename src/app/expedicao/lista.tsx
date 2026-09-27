@@ -4,6 +4,7 @@ import { Botao } from "@/components/botao";
 import { gerarLista } from "./listas/acoes";
 import { reterPacotes, tirarDoRetido } from "./retencao-acoes";
 import { FiltroColuna, type ValorDeFiltro } from "./filtro-coluna";
+import { MarcarTodos } from "./marcar-todos";
 
 export function ListaPacotes({
   pacotes,
@@ -47,7 +48,11 @@ export function ListaPacotes({
       <table className="w-full border-collapse">
         <thead>
           <tr>
-            {selecionavel && <Cabecalho largura="42px"> </Cabecalho>}
+            {selecionavel && (
+              <Cabecalho largura="42px">
+                <MarcarTodos />
+              </Cabecalho>
+            )}
             <Cabecalho largura="56px">Canal</Cabecalho>
             <Cabecalho largura="176px">Código</Cabecalho>
             <Cabecalho largura="178px">Cliente</Cabecalho>
