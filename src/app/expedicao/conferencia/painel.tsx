@@ -172,6 +172,16 @@ async function Detalhe({
 
   const conferencia = conferencias?.[0];
 
+  // A etiqueta em PDF existe? É ela que a bancada sem impressora abre na tela.
+  const { data: comPdf } = await supabase
+    .from("pacotes")
+    .select("envios ( etiqueta_pdf )")
+    .eq("id", pacote.id)
+    .maybeSingle();
+  const temEtiquetaPdf =
+    ((comPdf as unknown as { envios: { etiqueta_pdf: string | null } | null } | null)
+      ?.envios?.etiqueta_pdf ?? null) !== null;
+
   // Quem está no turno desta máquina pode zerar a conferência? A tela esconde
   // o botão, mas quem decide é o banco — esconder não impede de chamar.
   let podeReiniciar = false;
@@ -343,6 +353,7 @@ async function Detalhe({
                 jaLiberada={jaLiberada}
                 operadorId={turno?.operadorId ?? null}
                 podeReiniciar={podeReiniciar}
+                temEtiquetaPdf={temEtiquetaPdf}
                 lideres={lideres}
                 liberacao={liberacao}
               />

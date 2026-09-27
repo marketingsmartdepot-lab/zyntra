@@ -48,6 +48,7 @@ export function Bancada({
   jaLiberada,
   operadorId,
   podeReiniciar,
+  temEtiquetaPdf,
   lideres,
   liberacao,
 }: {
@@ -63,6 +64,8 @@ export function Bancada({
   operadorId: string | null;
   /** O operador do turno pode zerar esta conferência? */
   podeReiniciar?: boolean;
+  /** Há etiqueta em PDF guardada? Sem impressora, é o que se olha. */
+  temEtiquetaPdf?: boolean;
   lideres: Lider[];
   liberacao?: string;
 }) {
@@ -280,6 +283,17 @@ export function Bancada({
           fechar a conferência
         </span>
         <span className="flex-1" />
+        {temEtiquetaPdf && (
+          <a
+            href={`/expedicao/pacotes/${pacoteId}/etiqueta`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[12.5px] font-semibold no-underline"
+          >
+            Ver etiqueta
+          </a>
+        )}
+
         {podeReiniciar && operadorId && (
           <form action={reiniciarConferencia}>
             <input type="hidden" name="conferencia" value={conferenciaId} />

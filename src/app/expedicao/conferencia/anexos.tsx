@@ -28,7 +28,8 @@ export async function Anexos({ pacoteId }: { pacoteId: string }) {
     .select(
       `envio_id,
        envios ( ref_externa, etiqueta_conteudo, etiqueta_formato,
-                etiqueta_obtida_em, etiqueta_erro, situacao_canal, substatus_canal )`,
+                etiqueta_obtida_em, etiqueta_erro, situacao_canal, substatus_canal,
+                etiqueta_pdf )`,
     )
     .eq("id", pacoteId)
     .maybeSingle();
@@ -42,6 +43,7 @@ export async function Anexos({ pacoteId }: { pacoteId: string }) {
       etiqueta_erro: string | null;
       situacao_canal: string | null;
       substatus_canal: string | null;
+      etiqueta_pdf: string | null;
     } | null;
   } | null)?.envios;
 
@@ -74,6 +76,16 @@ export async function Anexos({ pacoteId }: { pacoteId: string }) {
             </span>
           )}
           <span className="flex-1" />
+          {envio?.etiqueta_pdf && (
+            <a
+              href={`/expedicao/pacotes/${pacoteId}/etiqueta`}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg border border-linha bg-superficie px-3 py-[5px] text-[12px] font-semibold no-underline"
+            >
+              Ver etiqueta
+            </a>
+          )}
           {envio?.etiqueta_obtida_em && (
             <span className="text-[11.5px] text-suave">
               obtida{" "}
