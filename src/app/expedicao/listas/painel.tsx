@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { imprimirLista } from "./acoes";
 
 type Resumo = {
   id: string;
@@ -196,16 +195,19 @@ async function ListaAberta({
         </div>
 
         {/* A única ação que sobrou. Não há "concluir": os pedidos já foram
-            para Conferir no momento em que a lista foi gerada. */}
-        <form action={imprimirLista}>
-          <input type="hidden" name="lista" value={lista.id} />
-          <button
-            type="submit"
-            className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold"
-          >
-            Reimprimir folha
-          </button>
-        </form>
+            para Conferir no momento em que a lista foi gerada.
+
+            Abre a folha numa aba nova e deixa o navegador perguntar a
+            impressora. A folha é A4 comum — qual impressora do corredor está
+            livre muda ao longo do dia, e quem sabe isso é quem está lá. */}
+        <a
+          href={`/expedicao/listas/${lista.id}/folha`}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-lg border border-linha px-4 py-[9px] text-[13px] font-semibold no-underline"
+        >
+          Imprimir folha
+        </a>
       </header>
 
       {impressao && <AvisoImpressao resultado={impressao} />}
