@@ -50,7 +50,8 @@ export function AbrirCarrinho({
         Registrar entrega na doca
       </button>
       <span className="max-w-[46ch] text-[12.5px] text-suave">
-        {aviso ?? "Depois é bipar cada caixa. O carrinho pode ser misto."}
+        {aviso ??
+          "Carrinho avulso, para caixa solta. O normal é a lista de separação virar carrinho sozinha ao finalizar a conferência."}
       </span>
     </form>
   );

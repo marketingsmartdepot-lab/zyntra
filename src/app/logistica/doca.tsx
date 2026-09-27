@@ -21,6 +21,8 @@ export type EntregaResumo = {
   entregue_em: string;
   pacotes: number;
   ja_sairam: number;
+  /** O carrinho É uma lista de separação, e não um agrupamento à mão. */
+  e_uma_lista: boolean;
 };
 
 function EntregasDoDia({ entregas }: { entregas: EntregaResumo[] }) {
@@ -29,7 +31,7 @@ function EntregasDoDia({ entregas }: { entregas: EntregaResumo[] }) {
   return (
     <section>
       <h3 className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave">
-        Entregas de hoje
+        Carrinhos de hoje
       </h3>
       <div className="flex flex-col gap-1">
         {entregas.map((e) => (
@@ -38,6 +40,11 @@ function EntregasDoDia({ entregas }: { entregas: EntregaResumo[] }) {
             className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-linha px-4 py-[9px] text-[12.5px]"
           >
             <span className="font-mono font-semibold">{e.codigo}</span>
+            {e.e_uma_lista && (
+              <span className="rounded-md border border-linha px-[8px] py-[2px] text-[11px] font-semibold text-suave">
+                lista de separação
+              </span>
+            )}
             <span className="text-suave">{e.entregue_por}</span>
             <span className="text-suave">
               {e.pacotes} {e.pacotes === 1 ? "caixa" : "caixas"}
@@ -49,7 +56,7 @@ function EntregasDoDia({ entregas }: { entregas: EntregaResumo[] }) {
               href={`/logistica?aba=doca&entrega=${e.id}&bipar=1`}
               className="font-semibold text-tinta no-underline"
             >
-              Continuar bipando
+              {e.e_uma_lista ? "Bipar o que faltou" : "Continuar bipando"}
             </Link>
           </div>
         ))}
