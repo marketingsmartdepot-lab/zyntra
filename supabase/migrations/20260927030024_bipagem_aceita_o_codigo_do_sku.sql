@@ -1,0 +1,6 @@
+-- Primeira versão: a bipagem passou a aceitar o código do SKU além do código
+-- de barras, porque ela digitou DC0094 e recebeu "desconhecido".
+--
+-- Substituída no mesmo minuto por 20260927030336, quando ficou claro que o
+-- DC0094 TEM código de barras no Bling e o problema era outro: o índice deste
+-- lado exigia código único no sistema inteiro. O corpo final está lá.

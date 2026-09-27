@@ -42,14 +42,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, motivo: "faltou_dado" }, { status: 400 });
   }
 
-  let resposta: Response;
-  try {
-    resposta = await fetch(
+  const pedir = (formato: string) =>
+    fetch(
       `https://api.mercadolibre.com/shipment_labels?shipment_ids=${encodeURIComponent(
         shipment_id,
-      )}&response_type=zpl2`,
+      )}&response_type=${formato}`,
       { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
     );
+
+  let resposta: Response;
+  let respostaPdf: Response | null = null;
+  try {
+    // Os dois formatos na mesma ida: o ZPL vai para a Zebra da bancada, e o
+    // PDF é o que se lê na tela quando não há impressora por perto. Buscar o
+    // PDF depois, sob demanda, exigiria o token do ML do lado do navegador.
+    [resposta, respostaPdf] = await Promise.all([pedir("zpl2"), pedir("pdf")]);
   } catch (e) {
     return NextResponse.json(
       { ok: false, motivo: "rede", detalhe: e instanceof Error ? e.message : "?" },
@@ -88,7 +95,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, motivo: "etiqueta_vazia" }, { status: 200 });
   }
 
-  return NextResponse.json({ ok: true, formato: "zpl", conteudo });
+  // O PDF é conforto, não operação: se falhar, a etiqueta ainda imprime.
+  let pdf: string | null = null;
+  try {
+    if (respostaPdf?.ok) {
+      const bytesPdf = Buffer.from(await respostaPdf.arrayBuffer());
+      pdf = Buffer.from(primeiroArquivoDoZipBinario(bytesPdf)).toString("base64");
+    }
+  } catch {
+    pdf = null;
+  }
+
+  return NextResponse.json({ ok: true, formato: "zpl", conteudo, pdf });
 }
 
 /**
@@ -99,6 +117,11 @@ export async function POST(request: NextRequest) {
  * o tamanho real só existe no índice. Foi o caso de arquivos do próprio ML.
  */
 function primeiroArquivoDoZip(buf: Buffer): string {
+  return primeiroArquivoDoZipBinario(buf).toString("latin1");
+}
+
+/** O mesmo, sem virar texto: PDF é binário e latin1 o corromperia. */
+function primeiroArquivoDoZipBinario(buf: Buffer): Buffer {
   // Fim do diretório central: PK\x05\x06, procurado de trás para frente
   // porque pode haver comentário depois dele.
   let fim = -1;
@@ -142,8 +165,8 @@ function primeiroArquivoDoZip(buf: Buffer): string {
 
   // 0 = guardado sem compressão, 8 = deflate. O ML usa deflate, mas guardado
   // acontece com arquivo pequeno.
-  if (metodo === 0) return dados.toString("latin1");
-  if (metodo === 8) return inflateRawSync(dados).toString("latin1");
+  if (metodo === 0) return dados;
+  if (metodo === 8) return inflateRawSync(dados);
 
   throw new Error(`compressao desconhecida: ${metodo}`);
 }
