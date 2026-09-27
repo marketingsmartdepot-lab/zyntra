@@ -15,6 +15,7 @@ import { AbrirCarrinho } from "../logistica/abrir-carrinho";
 import { PainelDetalhe } from "./conferencia/painel";
 import { PainelListas } from "./listas/painel";
 import { AbertoPorCausa } from "./aberto";
+import { Filtros } from "./filtros";
 
 export const metadata = { title: "Expedição — ZYNTRA" };
 
@@ -46,6 +47,9 @@ export default async function PaginaExpedicao({
     etiqueta?: string;
     reprocesso?: string;
     aba?: string;
+    busca?: string;
+    conta?: string;
+    modalidade?: string;
   }>;
 }) {
   const supabase = await criarClienteServidor();
@@ -67,6 +71,9 @@ export default async function PaginaExpedicao({
     quantos,
     recusados,
     aba,
+    busca,
+    conta,
+    modalidade,
   } = await searchParams;
   const vista: Vista = pedida && ehVista(pedida) ? pedida : "separar";
   // "listas" não é etapa: a consulta de pacotes continua olhando Separar.
@@ -93,12 +100,37 @@ export default async function PaginaExpedicao({
     .select("id", { count: "exact", head: true })
     .gte("criada_em", inicioDoDia.toISOString());
 
-  const { data: pacotes, error } = await supabase
-    .from("pacotes")
-    .select(SELECAO)
-    .eq("etapa", etapaAtiva)
-    .order("etapa_desde", { ascending: true })
-    .limit(200);
+  // Quem escolhe QUAIS pacotes é o banco, com os filtros; a consulta abaixo só
+  // busca os detalhes dos escolhidos. Filtrar depois de carregar funcionaria
+  // enquanto coubesse tudo na memória — e o dia em que não coubesse, pedidos
+  // sumiriam sem ninguém entender por quê.
+  const { data: escolhidos } = await supabase.rpc("pacotes_filtrados", {
+    p_etapa: etapaAtiva,
+    p_busca: busca ?? null,
+    p_conta: conta || null,
+    p_modalidade: modalidade || null,
+    p_limite: 200,
+  });
+
+  const ids = ((escolhidos ?? []) as { id: string }[]).map((x) => x.id);
+
+  const { data: pacotes, error } =
+    ids.length === 0
+      ? { data: [], error: null }
+      : await supabase
+          .from("pacotes")
+          .select(SELECAO)
+          .in("id", ids)
+          .order("etapa_desde", { ascending: true });
+
+  const [{ data: contasFiltro }, { data: modalidadesFiltro }] = await Promise.all([
+    supabase.from("contas").select("id, apelido").order("apelido"),
+    supabase
+      .from("modalidades")
+      .select("id, nome, canais!inner(slug)")
+      .eq("canais.slug", "mercado_livre")
+      .order("nome"),
+  ]);
 
   // Etapa vazia não quer dizer a mesma coisa antes e depois de haver conta.
   // Sem esta contagem, a tela dizia "nenhuma conta conectada" com uma conta
@@ -182,6 +214,22 @@ export default async function PaginaExpedicao({
       />
 
       <div className="flex flex-1 flex-col bg-superficie">
+        {vista !== "listas" && !pacote && (
+          <Filtros
+            vista={vista}
+            busca={busca}
+            conta={conta}
+            modalidade={modalidade}
+            contas={((contasFiltro ?? []) as { id: string; apelido: string }[]).map(
+              (c) => ({ id: c.id, nome: c.apelido }),
+            )}
+            modalidades={
+              (modalidadesFiltro ?? []) as unknown as { id: string; nome: string }[]
+            }
+            encontrados={pacotes?.length ?? 0}
+          />
+        )}
+
         {vista === "listas" ? (
           <PainelListas listaId={lista} impressao={impressao} />
         ) : vista === "aberto" && !pacote ? (
