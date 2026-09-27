@@ -244,6 +244,31 @@ async function Detalhe({
         <span className="rounded-full border border-linha px-[9px] py-[3px] text-[11.5px] font-semibold text-suave">
           {rotuloEtapa(pacote.etapa)}
         </span>
+
+        <span className="flex-1" />
+
+        {/* Fechar mora onde a mão procura: no canto do que está aberto. O
+            "Ver lista inteira" da barra lateral continua valendo, mas ninguém
+            olha para o outro lado da tela para sair de onde está. */}
+        <Link
+          href={`/expedicao?etapa=${etapa}`}
+          aria-label="Fechar o pedido e voltar para a lista"
+          title="Fechar"
+          className="-mr-1 flex h-8 w-8 items-center justify-center rounded-lg border border-linha text-suave no-underline hover:bg-fundo"
+        >
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </Link>
       </header>
 
       {/* As abas do pedido. O histórico é uma delas, e não um rodapé: embaixo
