@@ -15,7 +15,6 @@ import { AbrirCarrinho } from "../logistica/abrir-carrinho";
 import { PainelDetalhe } from "./conferencia/painel";
 import { PainelListas } from "./listas/painel";
 import { AbertoPorCausa } from "./aberto";
-import { Busca } from "./filtros";
 import type { ValorDeFiltro } from "./filtro-coluna";
 
 export const metadata = { title: "Expedição — ZYNTRA" };
@@ -48,7 +47,6 @@ export default async function PaginaExpedicao({
     impressao_etiqueta?: string;
     reprocesso?: string;
     aba?: string;
-    busca?: string;
     conta?: string;
     modalidade?: string;
     nf?: string;
@@ -74,7 +72,6 @@ export default async function PaginaExpedicao({
     quantos,
     recusados,
     aba,
-    busca,
     conta,
     modalidade,
     nf,
@@ -116,7 +113,7 @@ export default async function PaginaExpedicao({
 
   const { data: escolhidos } = await supabase.rpc("pacotes_filtrados", {
     p_etapa: etapaAtiva,
-    p_busca: busca ?? null,
+    p_busca: null,
     p_contas: valoresDe(conta),
     p_modalidades: valoresDe(modalidade),
     p_nf: valoresDe(nf),
@@ -143,7 +140,6 @@ export default async function PaginaExpedicao({
 
   const filtrosAtivos = {
     etapa: vista,
-    busca,
     conta,
     modalidade,
     nf,
@@ -232,10 +228,6 @@ export default async function PaginaExpedicao({
       />
 
       <div className="flex flex-1 flex-col bg-superficie">
-        {vista !== "listas" && !pacote && (
-          <Busca vista={vista} busca={busca} outros={filtrosAtivos} />
-        )}
-
         {vista === "listas" ? (
           <PainelListas listaId={lista} impressao={impressao} />
         ) : vista === "aberto" && !pacote ? (
