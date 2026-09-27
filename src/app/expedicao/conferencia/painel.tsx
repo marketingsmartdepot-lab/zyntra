@@ -7,6 +7,7 @@ import { turnoDaMaquina } from "@/lib/estacao";
 import type { DivergenciaAberta, Lider } from "./divergencia";
 import { BlocoDoPedido } from "./itens";
 import { FilaDePacotes, type PacoteNaFila } from "./fila";
+import { modoBipagemLigado } from "../bipagem-acoes";
 import { Anexos } from "./anexos";
 import {
   PainelEtiqueta,
@@ -296,6 +297,7 @@ async function Detalhe({
                 temEtiquetaPdf={temEtiquetaPdf}
                 lideres={lideres}
                 liberacao={liberacao}
+                modoBipagem={await modoBipagemLigado()}
               />
             ) : (
               <IniciarBancada pacoteId={pacote.id} />

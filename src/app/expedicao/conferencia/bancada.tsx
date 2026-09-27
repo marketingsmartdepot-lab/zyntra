@@ -51,10 +51,13 @@ export function Bancada({
   temEtiquetaPdf,
   lideres,
   liberacao,
+  modoBipagem,
 }: {
   conferenciaId: string;
   itensIniciais: ItemConferido[];
   proximoPacote: string | null;
+  /** No modo bipagem quem escolhe o próximo é o bipe, não a fila. */
+  modoBipagem: boolean;
   pacoteId: string;
   /** Divergência aberta deste pacote. Enquanto houver, a conferência não fecha. */
   divergencia: DivergenciaAberta | null;
@@ -147,10 +150,15 @@ export function Bancada({
         setErro(r.mensagem);
         return;
       }
+      // No modo bipagem, "próximo" é a caixa que a pessoa pegar na pilha, não
+      // a próxima da fila. Abrir um pedido que ela não bipou a deixaria
+      // olhando uma caixa e conferindo outra.
       router.replace(
-        proximoPacote
-          ? `/expedicao?etapa=conferir&pacote=${proximoPacote}`
-          : "/expedicao?etapa=conferir",
+        modoBipagem
+          ? "/expedicao?etapa=conferir&bipagem=1"
+          : proximoPacote
+            ? `/expedicao?etapa=conferir&pacote=${proximoPacote}`
+            : "/expedicao?etapa=conferir",
       );
       router.refresh();
     });
@@ -321,7 +329,11 @@ export function Bancada({
               : "cursor-not-allowed bg-[#DEDAD0] text-[#8C8880]"
           }`}
         >
-          {finalizando ? "Finalizando…" : "Finalizar e próximo"}
+          {finalizando
+            ? "Finalizando…"
+            : modoBipagem
+              ? "Finalizar e bipar o próximo"
+              : "Finalizar e próximo"}
           {!completo && (
             <span className="block text-[11.5px] font-medium">
               {jaLiberada && !divergencia
