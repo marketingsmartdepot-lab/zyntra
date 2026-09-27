@@ -3,17 +3,27 @@ import type { Etapa, LinhaPacote } from "@/lib/supabase/tipos";
 import { Botao } from "@/components/botao";
 import { gerarLista } from "./listas/acoes";
 import { reterPacotes, tirarDoRetido } from "./retencao-acoes";
+import { FiltroColuna, type ValorDeFiltro } from "./filtro-coluna";
 
 export function ListaPacotes({
   pacotes,
   etapa,
   vista,
+  valores = [],
+  filtros = {},
 }: {
   pacotes: LinhaPacote[];
   etapa: Etapa;
   /** Qual aba está aberta: é ela que decide quais ações cabem. */
   vista: string;
+  /** Os valores que existem em cada coluna desta etapa. */
+  valores?: ValorDeFiltro[];
+  /** Os filtros ativos, do endereço. */
+  filtros?: Record<string, string | undefined>;
 }) {
+  const daColuna = (c: string) => valores.filter((v) => v.coluna === c);
+  const marcados = (c: string) =>
+    (filtros[c] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   // Conferir fica de fora de propósito: ali é uma caixa por vez na bancada, e
   // ação em massa desfaz justamente o que a conferência existe para garantir.
   const podeReter = ["aberto", "faturado", "separar"].includes(vista);
@@ -32,7 +42,15 @@ export function ListaPacotes({
             <Cabecalho largura="176px">Código</Cabecalho>
             <Cabecalho largura="178px">Cliente</Cabecalho>
             <Cabecalho largura="158px">Conta</Cabecalho>
-            <Cabecalho largura="112px">Modalidade</Cabecalho>
+            <Cabecalho largura="112px">
+              <FiltroColuna
+                coluna="modalidade"
+                rotulo="Modalidade"
+                valores={daColuna("modalidade")}
+                selecionados={marcados("modalidade")}
+                outros={filtros}
+              />
+            </Cabecalho>
             <Cabecalho largura="142px">Data limite</Cabecalho>
             <Cabecalho largura="158px">NF-e</Cabecalho>
             <Cabecalho largura="150px">Etiqueta</Cabecalho>
@@ -168,8 +186,9 @@ export function ListaPacotes({
       <div className="mt-auto flex flex-wrap items-center gap-3 border-t border-linha bg-fundo px-5 py-3">
         {podeListar && (
           <span className="max-w-[60ch] text-[12.5px] text-suave">
-            Marque os pedidos e gere a lista: a folha sai na impressora desta
-            bancada e os pedidos passam para <b>Conferir</b> no mesmo ato.
+            Marque os pedidos e gere a lista: os pedidos passam para{" "}
+            <b>Conferir</b> no mesmo ato, e a folha abre para você escolher a
+            impressora.
           </span>
         )}
 
@@ -349,7 +368,7 @@ function Cabecalho({
   return (
     <th
       style={largura ? { width: largura } : undefined}
-      className="whitespace-nowrap border-b border-linha px-3 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-suave"
+      className="relative whitespace-nowrap border-b border-linha px-3 py-3 text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-suave"
     >
       {children}
     </th>

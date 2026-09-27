@@ -15,7 +15,8 @@ import { AbrirCarrinho } from "../logistica/abrir-carrinho";
 import { PainelDetalhe } from "./conferencia/painel";
 import { PainelListas } from "./listas/painel";
 import { AbertoPorCausa } from "./aberto";
-import { Filtros } from "./filtros";
+import { Busca } from "./filtros";
+import type { ValorDeFiltro } from "./filtro-coluna";
 
 export const metadata = { title: "Expedição — ZYNTRA" };
 
@@ -44,12 +45,14 @@ export default async function PaginaExpedicao({
     falha?: string;
     impressao?: string;
     liberacao?: string;
-    etiqueta?: string;
+    impressao_etiqueta?: string;
     reprocesso?: string;
     aba?: string;
     busca?: string;
     conta?: string;
     modalidade?: string;
+    nf?: string;
+    etiqueta?: string;
   }>;
 }) {
   const supabase = await criarClienteServidor();
@@ -65,7 +68,7 @@ export default async function PaginaExpedicao({
     falha,
     impressao,
     liberacao,
-    etiqueta,
+    impressao_etiqueta: impressaoEtiqueta,
     reprocesso,
     feito,
     quantos,
@@ -74,6 +77,8 @@ export default async function PaginaExpedicao({
     busca,
     conta,
     modalidade,
+    nf,
+    etiqueta,
   } = await searchParams;
   const vista: Vista = pedida && ehVista(pedida) ? pedida : "separar";
   // "listas" não é etapa: a consulta de pacotes continua olhando Separar.
@@ -104,11 +109,18 @@ export default async function PaginaExpedicao({
   // busca os detalhes dos escolhidos. Filtrar depois de carregar funcionaria
   // enquanto coubesse tudo na memória — e o dia em que não coubesse, pedidos
   // sumiriam sem ninguém entender por quê.
+  // Vários valores por coluna: o time separa Flex e Agência no mesmo carrinho,
+  // e um seletor de valor único obrigaria a duas passagens.
+  const valoresDe = (v?: string) =>
+    (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+
   const { data: escolhidos } = await supabase.rpc("pacotes_filtrados", {
     p_etapa: etapaAtiva,
     p_busca: busca ?? null,
-    p_conta: conta || null,
-    p_modalidade: modalidade || null,
+    p_contas: valoresDe(conta),
+    p_modalidades: valoresDe(modalidade),
+    p_nf: valoresDe(nf),
+    p_etiqueta: valoresDe(etiqueta),
     p_limite: 200,
   });
 
@@ -123,14 +135,20 @@ export default async function PaginaExpedicao({
           .in("id", ids)
           .order("etapa_desde", { ascending: true });
 
-  const [{ data: contasFiltro }, { data: modalidadesFiltro }] = await Promise.all([
-    supabase.from("contas").select("id, apelido").order("apelido"),
-    supabase
-      .from("modalidades")
-      .select("id, nome, canais!inner(slug)")
-      .eq("canais.slug", "mercado_livre")
-      .order("nome"),
-  ]);
+  // Os valores que o filtro oferece são os que existem nesta etapa. Oferecer
+  // uma conta sem nenhum pedido aqui é dar uma opção que não muda nada.
+  const { data: valoresDeFiltro } = await supabase.rpc("valores_para_filtro", {
+    p_etapa: etapaAtiva,
+  });
+
+  const filtrosAtivos = {
+    etapa: vista,
+    busca,
+    conta,
+    modalidade,
+    nf,
+    etiqueta,
+  };
 
   // Etapa vazia não quer dizer a mesma coisa antes e depois de haver conta.
   // Sem esta contagem, a tela dizia "nenhuma conta conectada" com uma conta
@@ -215,19 +233,7 @@ export default async function PaginaExpedicao({
 
       <div className="flex flex-1 flex-col bg-superficie">
         {vista !== "listas" && !pacote && (
-          <Filtros
-            vista={vista}
-            busca={busca}
-            conta={conta}
-            modalidade={modalidade}
-            contas={((contasFiltro ?? []) as { id: string; apelido: string }[]).map(
-              (c) => ({ id: c.id, nome: c.apelido }),
-            )}
-            modalidades={
-              (modalidadesFiltro ?? []) as unknown as { id: string; nome: string }[]
-            }
-            encontrados={pacotes?.length ?? 0}
-          />
+          <Busca vista={vista} busca={busca} outros={filtrosAtivos} />
         )}
 
         {vista === "listas" ? (
@@ -247,6 +253,8 @@ export default async function PaginaExpedicao({
                 pacotes={pacotes as unknown as LinhaPacote[]}
                 etapa="aberto"
                 vista="aberto"
+                valores={(valoresDeFiltro ?? []) as ValorDeFiltro[]}
+                filtros={filtrosAtivos}
               />
             )}
           </div>
@@ -256,7 +264,7 @@ export default async function PaginaExpedicao({
             pacoteId={pacote}
             etapa={etapaAtiva}
             liberacao={liberacao}
-            etiqueta={etiqueta}
+            etiqueta={impressaoEtiqueta}
             aba={aba}
           />
         ) : error ? (
@@ -273,6 +281,8 @@ export default async function PaginaExpedicao({
               pacotes={pacotes as unknown as LinhaPacote[]}
               etapa={etapaAtiva}
               vista={vista}
+              valores={(valoresDeFiltro ?? []) as ValorDeFiltro[]}
+              filtros={filtrosAtivos}
             />
             {/* O fechamento mora aqui: quando a caixa está pronta pra envio, o
                 passo seguinte é levá-la para a doca. Mandar a pessoa trocar de

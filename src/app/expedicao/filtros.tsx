@@ -1,103 +1,60 @@
 import Link from "next/link";
 
-type Opcao = { id: string; nome: string };
-
 /**
- * Os filtros da esteira.
+ * A busca da esteira.
  *
- * Um campo de busca só, e não um por coluna: quem está na bancada tem um papel
- * na mão com um número e não sabe se aquele número é pedido, pack ou envio.
- * A busca cobre os três, mais cliente, SKU e título do anúncio.
+ * Um campo só, e não um por coluna: quem está na bancada tem um papel na mão
+ * com um número e não sabe se aquele número é pedido, pack ou envio. A busca
+ * cobre os três, mais cliente, SKU e título do anúncio.
  *
- * Formulário por GET, de propósito: o filtro fica no endereço. Assim dá para
- * mandar o link de uma seleção para outra pessoa, e voltar para a mesma tela
- * depois de gerar uma lista.
+ * Conta, modalidade, NF-e e etiqueta não ficam aqui — ficam na própria coluna,
+ * onde a pessoa está olhando quando decide filtrar.
  */
-export function Filtros({
+export function Busca({
   vista,
   busca,
-  conta,
-  modalidade,
-  contas,
-  modalidades,
-  encontrados,
+  outros,
 }: {
   vista: string;
   busca?: string;
-  conta?: string;
-  modalidade?: string;
-  contas: Opcao[];
-  modalidades: Opcao[];
-  encontrados: number;
+  outros: Record<string, string | undefined>;
 }) {
-  const filtrando = Boolean(busca || conta || modalidade);
+  const outrosFiltros = Object.entries(outros).filter(
+    ([k, v]) => v && k !== "busca" && k !== "etapa",
+  );
 
   return (
     <form
       method="GET"
       action="/expedicao"
-      className="flex flex-wrap items-center gap-2 border-b border-linha bg-fundo px-5 py-[10px]"
+      className="flex flex-wrap items-center gap-2 border-b border-linha bg-fundo px-5 py-[9px]"
     >
       <input type="hidden" name="etapa" value={vista} />
+      {outrosFiltros.map(([k, v]) => (
+        <input key={k} type="hidden" name={k} value={v} />
+      ))}
 
       <input
         name="busca"
         defaultValue={busca ?? ""}
         placeholder="Pedido, pack, envio, cliente, SKU ou anúncio"
         aria-label="Buscar"
-        className="w-[320px] max-w-full rounded-lg border border-linha bg-superficie px-3 py-[7px] text-[13px]"
+        className="w-[330px] max-w-full rounded-lg border border-linha bg-superficie px-3 py-[6px] text-[12.5px]"
       />
-
-      {contas.length > 1 && (
-        <select
-          name="conta"
-          defaultValue={conta ?? ""}
-          aria-label="Conta"
-          className="rounded-lg border border-linha bg-superficie px-2 py-[7px] text-[13px]"
-        >
-          <option value="">Todas as contas</option>
-          {contas.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nome}
-            </option>
-          ))}
-        </select>
-      )}
-
-      <select
-        name="modalidade"
-        defaultValue={modalidade ?? ""}
-        aria-label="Modalidade"
-        className="rounded-lg border border-linha bg-superficie px-2 py-[7px] text-[13px]"
-      >
-        <option value="">Todas as modalidades</option>
-        {modalidades.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.nome}
-          </option>
-        ))}
-      </select>
-
       <button
         type="submit"
-        className="rounded-lg border border-linha bg-superficie px-3 py-[7px] text-[12.5px] font-semibold"
+        className="rounded-lg border border-linha bg-superficie px-3 py-[6px] text-[12px] font-semibold"
       >
-        Filtrar
+        Buscar
       </button>
 
-      {filtrando && (
-        <>
-          <Link
-            href={`/expedicao?etapa=${vista}`}
-            className="rounded-lg px-2 py-[7px] text-[12.5px] font-semibold text-suave no-underline"
-          >
-            Limpar
-          </Link>
-          <span className="text-[12.5px] text-suave">
-            <b className="font-semibold text-tinta">{encontrados}</b>
-            {encontrados === 1 ? " encontrado" : " encontrados"}
-          </span>
-        </>
+      {(busca || outrosFiltros.length > 0) && (
+        <Link
+          href={`/expedicao?etapa=${vista}`}
+          className="px-1 text-[12px] font-semibold text-suave no-underline"
+        >
+          Limpar tudo
+        </Link>
       )}
     </form>
   );

@@ -19,7 +19,7 @@ export async function imprimirEtiqueta(formData: FormData) {
   const motivoReimpressao = String(formData.get("motivo") ?? "").trim();
 
   const voltar = (resultado: string) =>
-    redirect(`/expedicao?etapa=pronto&pacote=${pacoteId}&etiqueta=${resultado}`);
+    redirect(`/expedicao?etapa=pronto&pacote=${pacoteId}&impressao_etiqueta=${resultado}`);
 
   const estacao = await estacaoDaMaquina();
   if (!estacao) {
