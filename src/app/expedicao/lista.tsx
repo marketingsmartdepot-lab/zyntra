@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Etapa, LinhaPacote } from "@/lib/supabase/tipos";
 import { Botao } from "@/components/botao";
 import { gerarLista } from "./listas/acoes";
-import { reterPacotes, tirarDoRetido } from "./retencao-acoes";
+import { tirarDoRetido } from "./retencao-acoes";
 import { FiltroColuna, type ValorDeFiltro } from "./filtro-coluna";
 import { MarcarTodos } from "./marcar-todos";
 import { ContagemSelecionada } from "./contagem-selecionada";
@@ -35,13 +35,11 @@ export function ListaPacotes({
   // aqui, e a PERMISSÃO diz se esta pessoa a tem. Botão que aparece e volta
   // "sem permissão" ensina o time a desconfiar da tela.
   const liberado = (chave: string) => permissoes.includes(chave);
-  const podeReter =
-    ["aberto", "faturado", "separar"].includes(vista) && liberado("reter_pedido");
   const podeListar = vista === "separar" && liberado("gerar_lista");
   const podeDevolver = vista === "retido" && liberado("reter_pedido");
-  // Gerar lista também precisa de caixinha: quem tem 'gerar_lista' sem
-  // 'reter_pedido' ficaria com a tabela travada e nada para selecionar.
-  const selecionavel = podeReter || podeDevolver || podeListar;
+  // Reter saiu da esteira a pedido dela. Devolver fica: sem ele, o que já
+  // está em Retidos não teria como voltar.
+  const selecionavel = podeDevolver || podeListar;
   const agora = Date.now();
 
   const tabela = (
@@ -219,25 +217,6 @@ export function ListaPacotes({
         )}
 
         <span className="flex-1" />
-
-        {podeReter && (
-          <span className="flex items-center gap-2">
-            <input
-              id="motivo-retencao"
-              name="motivo"
-              aria-label="Por que está retendo"
-              placeholder="por que está retendo"
-              className="w-[240px] rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13px]"
-            />
-            <Botao
-              formAction={reterPacotes}
-              trabalhando="Retendo…"
-              className="rounded-lg border border-atencao-linha px-4 py-[9px] text-[13px] font-semibold text-atencao"
-            >
-              Reter
-            </Botao>
-          </span>
-        )}
 
         {podeDevolver && (
           <Botao
