@@ -25,6 +25,10 @@ export function MarcarTodos() {
           .forEach((caixa) => {
             caixa.checked = marcar;
           });
+
+        // Marcar caixinha por código não dispara `change`. Sem este aviso, a
+        // contagem ao lado diria zero depois de selecionar tudo.
+        formulario.dispatchEvent(new CustomEvent("zyntra:selecao"));
       }}
     />
   );

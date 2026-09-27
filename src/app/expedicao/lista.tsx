@@ -5,6 +5,7 @@ import { gerarLista } from "./listas/acoes";
 import { reterPacotes, tirarDoRetido } from "./retencao-acoes";
 import { FiltroColuna, type ValorDeFiltro } from "./filtro-coluna";
 import { MarcarTodos } from "./marcar-todos";
+import { ContagemSelecionada } from "./contagem-selecionada";
 
 export function ListaPacotes({
   pacotes,
@@ -199,6 +200,8 @@ export function ListaPacotes({
       {tabela}
 
       <div className="mt-auto flex flex-wrap items-center gap-3 border-t border-linha bg-fundo px-5 py-3">
+        <ContagemSelecionada />
+
         {podeListar && (
           <span className="max-w-[60ch] text-[12.5px] text-suave">
             Marque os pedidos e gere a lista: os pedidos passam para{" "}
