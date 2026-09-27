@@ -45,6 +45,7 @@ export default async function PaginaExpedicao({
     liberacao?: string;
     etiqueta?: string;
     reprocesso?: string;
+    aba?: string;
   }>;
 }) {
   const supabase = await criarClienteServidor();
@@ -65,6 +66,7 @@ export default async function PaginaExpedicao({
     feito,
     quantos,
     recusados,
+    aba,
   } = await searchParams;
   const vista: Vista = pedida && ehVista(pedida) ? pedida : "separar";
   // "listas" não é etapa: a consulta de pacotes continua olhando Separar.
@@ -207,6 +209,7 @@ export default async function PaginaExpedicao({
             etapa={etapaAtiva}
             liberacao={liberacao}
             etiqueta={etiqueta}
+            aba={aba}
           />
         ) : error ? (
           <Vazio

@@ -5,7 +5,7 @@ import { Bancada, type ItemConferido } from "./bancada";
 import { iniciarConferencia } from "./acoes";
 import { turnoDaMaquina } from "@/lib/estacao";
 import type { DivergenciaAberta, Lider } from "./divergencia";
-import { ItensDoPedido } from "./itens";
+import { BlocoDoPedido } from "./itens";
 import {
   PainelEtiqueta,
   type ImpressaoDaEtiqueta,
@@ -37,12 +37,15 @@ export async function PainelDetalhe({
   etapa,
   liberacao,
   etiqueta,
+  aba,
 }: {
   fila: PacoteNaFila[];
   pacoteId: string;
   etapa: Etapa;
   liberacao?: string;
   etiqueta?: string;
+  /** Qual aba do pedido está aberta. O histórico é uma delas, não um rodapé. */
+  aba?: string;
 }) {
   const selecionado = fila.find((p) => p.id === pacoteId) ?? null;
 
@@ -105,6 +108,7 @@ export async function PainelDetalhe({
             etapa={etapa}
             liberacao={liberacao}
             etiqueta={etiqueta}
+            aba={aba === "timeline" ? "timeline" : "geral"}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center px-6 py-20">
@@ -124,12 +128,14 @@ async function Detalhe({
   etapa,
   liberacao,
   etiqueta,
+  aba,
 }: {
   pacote: PacoteNaFila;
   fila: PacoteNaFila[];
   etapa: Etapa;
   liberacao?: string;
   etiqueta?: string;
+  aba: "geral" | "timeline";
 }) {
   const supabase = await criarClienteServidor();
   const pedidos = pacote.envios?.pedidos ?? [];
@@ -213,6 +219,15 @@ async function Detalhe({
     }));
   }
 
+  const abas = [
+    { chave: "geral", rotulo: "Geral" },
+    { chave: "timeline", rotulo: "Timeline" },
+  ] as const;
+
+  const enderecoDaAba = (chave: string) =>
+    `/expedicao?etapa=${etapa}&pacote=${pacote.id}` +
+    (chave === "geral" ? "" : `&aba=${chave}`);
+
   return (
     <>
       <header className="flex flex-wrap items-center gap-3 px-6 pt-5">
@@ -231,70 +246,106 @@ async function Detalhe({
         </span>
       </header>
 
-      <dl className="grid grid-cols-[auto_1fr_auto_1fr] items-baseline gap-x-[14px] gap-y-[7px] px-6 py-4 text-[13px]">
-        <dt className="font-medium text-suave">Conta</dt>
-        <dd className="m-0 font-semibold">{pacote.contas?.apelido ?? "—"}</dd>
-        <dt className="font-medium text-suave">Modalidade</dt>
-        <dd className="m-0 font-semibold">
-          {pacote.envios?.modalidades?.nome ?? "não classificada"}
-        </dd>
-        <dt className="font-medium text-suave">Empresa emissora</dt>
-        <dd className="m-0 font-semibold">
-          {pacote.contas?.empresas?.nome_curto ?? "—"}
-        </dd>
-        <dt className="font-medium text-suave">Data limite</dt>
-        <dd className="m-0 font-semibold">
-          {pacote.envios?.limite_envio_em
-            ? new Date(pacote.envios.limite_envio_em).toLocaleString("pt-BR", {
-                dateStyle: "short",
-                timeStyle: "short",
-                timeZone: "America/Sao_Paulo",
-              })
-            : "sem prazo do canal"}
-        </dd>
-        <dt className="font-medium text-suave">Etiqueta</dt>
-        <dd className="m-0 font-semibold">
-          {pacote.envios?.etiqueta_obtida_em ? "obtida do canal" : "pendente"}
-        </dd>
-        <dt className="font-medium text-suave">Unidades</dt>
-        <dd className="m-0 font-semibold">
-          {pacote.unidades_esperadas ?? "—"}
-        </dd>
-      </dl>
+      {/* As abas do pedido. O histórico é uma delas, e não um rodapé: embaixo
+          da tabela ele empurrava para fora da tela justamente o que a bancada
+          precisa ver. */}
+      <nav className="mt-4 flex gap-1 border-b border-linha px-6">
+        {abas.map((a) => {
+          const ativa = a.chave === aba;
+          return (
+            <Link
+              key={a.chave}
+              href={enderecoDaAba(a.chave)}
+              aria-current={ativa ? "page" : undefined}
+              className={`-mb-px border-b-2 px-3 py-[9px] text-[13.5px] font-semibold no-underline ${
+                ativa
+                  ? "border-tinta text-tinta"
+                  : "border-transparent text-suave"
+              }`}
+            >
+              {a.rotulo}
+            </Link>
+          );
+        })}
+      </nav>
 
-      <ItensDoPedido pacoteId={pacote.id} />
-
-      {etapa === "pronto" && (
-        <PainelEtiqueta
-          pacoteId={pacote.id}
-          impressoes={(impressoesEtiqueta ?? []) as ImpressaoDaEtiqueta[]}
-          resultado={etiqueta}
-          operadorId={turno?.operadorId ?? null}
-        />
-      )}
-
-      {etapa === "conferir" ? (
-        conferencia ? (
-          <Bancada
-            conferenciaId={conferencia.id}
-            itensIniciais={itens}
-            proximoPacote={proximo}
-            pacoteId={pacote.id}
-            divergencia={divergencia}
-            jaLiberada={jaLiberada}
-            operadorId={turno?.operadorId ?? null}
-            lideres={lideres}
-            liberacao={liberacao}
-          />
-        ) : (
-          <IniciarBancada pacoteId={pacote.id} />
-        )
-      ) : (
+      {aba === "timeline" ? (
         <Historico eventos={(eventos ?? []) as Evento[]} />
+      ) : (
+        <>
+          <div className="pt-5" />
+          <BlocoDoPedido
+            pacoteId={pacote.id}
+            conferenciaId={conferencia?.id ?? null}
+          />
+
+          {etapa === "pronto" && (
+            <PainelEtiqueta
+              pacoteId={pacote.id}
+              impressoes={(impressoesEtiqueta ?? []) as ImpressaoDaEtiqueta[]}
+              resultado={etiqueta}
+              operadorId={turno?.operadorId ?? null}
+            />
+          )}
+
+          {etapa === "conferir" ? (
+            conferencia ? (
+              <Bancada
+                conferenciaId={conferencia.id}
+                itensIniciais={itens}
+                proximoPacote={proximo}
+                pacoteId={pacote.id}
+                divergencia={divergencia}
+                jaLiberada={jaLiberada}
+                operadorId={turno?.operadorId ?? null}
+                lideres={lideres}
+                liberacao={liberacao}
+              />
+            ) : (
+              <IniciarBancada pacoteId={pacote.id} />
+            )
+          ) : (
+            <BiparAindaNao etapa={etapa} />
+          )}
+        </>
       )}
     </>
   );
 }
+
+/**
+ * O campo de bipagem nas etapas em que a conferência ainda não abriu.
+ *
+ * Ele aparece, porque é onde a pessoa espera encontrá-lo, mas não aceita
+ * leitura. Bipar antes da nota autorizada permitiria fechar a caixa e imprimir
+ * sem nota — exatamente o que a esteira existe para impedir. Some o campo, e
+ * ela procura; deixe-o funcionar, e a regra vira decoração. Então ele fica, e
+ * diz o que falta.
+ */
+function BiparAindaNao({ etapa }: { etapa: Etapa }) {
+  const motivo: Partial<Record<Etapa, string>> = {
+    aberto: "A conferência abre quando a nota estiver autorizada.",
+    faturado: "A conferência abre quando o pedido chegar em Separar e a lista sair.",
+    separar: "A conferência abre ao gerar a lista de separação.",
+    pronto: "Esta caixa já foi conferida e lacrada.",
+    retido: "Pedido retido não é conferido enquanto o problema não se resolver.",
+  };
+
+  return (
+    <div className="mx-6 mt-5 mb-6 flex flex-wrap items-center gap-3 rounded-[10px] border border-dashed border-linha px-4 py-[14px]">
+      <input
+        disabled
+        placeholder="Conferência: insira o EAN ou bipe o produto"
+        aria-label="Conferência"
+        className="min-w-[280px] flex-1 rounded-lg border border-linha bg-fundo px-3 py-[10px] text-[13.5px] text-suave"
+      />
+      <span className="text-[12.5px] text-suave">
+        {motivo[etapa] ?? "A conferência acontece na aba Conferir."}
+      </span>
+    </div>
+  );
+}
+
 
 type Evento = {
   tipo: string;
