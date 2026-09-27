@@ -96,11 +96,26 @@ export async function POST(request: NextRequest) {
   }
 
   // O PDF é conforto, não operação: se falhar, a etiqueta ainda imprime.
+  //
+  // E ele NÃO vem zipado — só o ZPL vem. O ML responde application/pdf, cru.
+  // Por isso o formato é decidido pelos primeiros bytes, e não pelo que se
+  // esperava receber: %PDF é PDF, PK é zip.
   let pdf: string | null = null;
   try {
     if (respostaPdf?.ok) {
       const bytesPdf = Buffer.from(await respostaPdf.arrayBuffer());
-      pdf = Buffer.from(primeiroArquivoDoZipBinario(bytesPdf)).toString("base64");
+      const marca = bytesPdf.subarray(0, 4).toString("latin1");
+
+      const puro =
+        marca === "%PDF"
+          ? bytesPdf
+          : marca.startsWith("PK")
+            ? primeiroArquivoDoZipBinario(bytesPdf)
+            : null;
+
+      if (puro && puro.subarray(0, 4).toString("latin1") === "%PDF") {
+        pdf = puro.toString("base64");
+      }
     }
   } catch {
     pdf = null;
