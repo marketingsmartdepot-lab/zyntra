@@ -199,8 +199,8 @@ export default async function FolhaDaLista({
         <thead>
           <tr>
             <th style={{ width: 130 }}>SKU</th>
-            <th>Produto</th>
             <th style={{ width: 190 }}>Pedido</th>
+            <th>Produto</th>
             <th style={{ width: 62 }} className="num">Unid.</th>
             <th style={{ width: 74 }} className="num">Pacotes</th>
             <th style={{ width: 40 }}>Ok</th>
@@ -213,10 +213,10 @@ export default async function FolhaDaLista({
                 {li.codigo}
                 {li.codigo_barras && <span className="ean">{li.codigo_barras}</span>}
               </td>
-              <td>{li.descricao ?? "Produto sem descrição"}</td>
               <td className="ped">
                 {[...(pedidosPorSku.get(li.codigo) ?? [])].join(" · ") || "—"}
               </td>
+              <td>{li.descricao ?? "Produto sem descrição"}</td>
               <td className="num">{li.unidades}</td>
               <td className="num">{li.pacotes}</td>
               <td>
