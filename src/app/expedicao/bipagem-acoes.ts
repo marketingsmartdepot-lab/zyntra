@@ -7,8 +7,20 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 
 const COOKIE = "zyntra_modo_bipagem";
 
-/** O modo fica ligado na MÁQUINA, não na pessoa: é a bancada que bipa. */
-export async function modoBipagemLigado() {
+/**
+ * O modo fica ligado na MÁQUINA, não na pessoa: é a bancada que bipa.
+ *
+ * O parâmetro da URL manda mais que o cookie, e é por uma razão chata: quando
+ * um Server Action grava cookie E redireciona, o Next desenha o destino ainda
+ * dentro da mesma resposta, onde `cookies()` é o do pedido ANTERIOR. Sem o
+ * parâmetro, clicar em "Ligar" gravava certo e devolvia a tela velha.
+ *
+ * O cookie continua valendo para tudo que vem depois — abrir um pedido, voltar
+ * para a lista, recarregar a aba.
+ */
+export async function modoBipagemLigado(daUrl?: string) {
+  if (daUrl === "1") return true;
+  if (daUrl === "0") return false;
   return (await cookies()).get(COOKIE)?.value === "1";
 }
 
@@ -27,7 +39,7 @@ export async function alternarModoBipagem(formData: FormData) {
   }
 
   revalidatePath("/expedicao");
-  redirect("/expedicao?etapa=conferir");
+  redirect(`/expedicao?etapa=conferir&bipagem=${ligar ? "1" : "0"}`);
 }
 
 /**
@@ -46,14 +58,16 @@ export async function acharPedido(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/expedicao?etapa=conferir&bipe=erro&codigo=${encodeURIComponent(codigo)}`);
+    redirect(
+      `/expedicao?etapa=conferir&bipagem=1&bipe=erro&codigo=${encodeURIComponent(codigo)}`,
+    );
   }
 
   const achados = (data ?? []) as { pacote_id: string }[];
 
   if (achados.length === 0) {
     redirect(
-      `/expedicao?etapa=conferir&bipe=nenhum&codigo=${encodeURIComponent(codigo)}`,
+      `/expedicao?etapa=conferir&bipagem=1&bipe=nenhum&codigo=${encodeURIComponent(codigo)}`,
     );
   }
 
@@ -62,6 +76,6 @@ export async function acharPedido(formData: FormData) {
   }
 
   redirect(
-    `/expedicao?etapa=conferir&bipe=varios&codigo=${encodeURIComponent(codigo)}`,
+    `/expedicao?etapa=conferir&bipagem=1&bipe=varios&codigo=${encodeURIComponent(codigo)}`,
   );
 }

@@ -57,6 +57,7 @@ export default async function PaginaExpedicao({
     etiqueta?: string;
     bipe?: string;
     codigo?: string;
+    bipagem?: string;
   }>;
 }) {
   const supabase = await criarClienteServidor();
@@ -79,6 +80,7 @@ export default async function PaginaExpedicao({
     impressao_etiqueta: impressaoEtiqueta,
     bipe,
     codigo: codigoBipado,
+    bipagem,
     reprocesso,
     feito,
     quantos,
@@ -263,7 +265,7 @@ export default async function PaginaExpedicao({
               />
             )}
           </div>
-        ) : vista === "conferir" && !pacote && (await modoBipagemLigado()) ? (
+        ) : vista === "conferir" && !pacote && (await modoBipagemLigado(bipagem)) ? (
           /* A fila à esquerda só existe no modo bipagem. Com ele desligado,
              Conferir continua sendo a lista de largura inteira. */
           <EsperandoBipe
