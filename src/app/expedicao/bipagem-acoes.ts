@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { iniciarConferencia } from "./conferencia/acoes";
 
 const COOKIE = "zyntra_modo_bipagem";
 
@@ -72,6 +73,14 @@ export async function acharPedido(formData: FormData) {
   }
 
   if (achados.length === 1) {
+    // Bipou, achou: já abre a bancada, sem o clique do meio. O produto
+    // bipado NÃO conta como lido — achar o pedido e provar que a peça está
+    // na caixa são coisas diferentes, e ela escolheu manter as duas.
+    //
+    // Se abrir falhar (máquina sem bancada escolhida, por exemplo), o pedido
+    // abre mesmo assim e o botão "Abrir a bancada" aparece como antes: é
+    // melhor um clique a mais do que uma tela de erro com a caixa na mão.
+    await iniciarConferencia(achados[0].pacote_id);
     redirect(`/expedicao?etapa=conferir&pacote=${achados[0].pacote_id}`);
   }
 

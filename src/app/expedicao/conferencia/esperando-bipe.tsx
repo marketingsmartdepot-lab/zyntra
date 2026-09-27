@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Botao } from "@/components/botao";
 import { FilaDePacotes, type PacoteNaFila } from "./fila";
@@ -29,6 +30,31 @@ export async function EsperandoBipe({
       <FilaDePacotes fila={fila} etapa="conferir" />
 
       <section className="relative flex min-w-0 flex-1 flex-col">
+        {/* Fechar mora onde a mão procura: no canto do que está aberto. E
+            fechar aqui DESLIGA o modo — com ele ligado, voltar para a lista
+            traria esta mesma tela de novo, e o X não teria fechado nada. */}
+        <div className="flex items-center justify-end border-b border-linha px-5 py-2">
+          <Link
+            href="/expedicao?etapa=conferir&bipagem=0"
+            aria-label="Fechar o modo bipagem e voltar para a lista"
+            title="Fechar"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-linha text-suave no-underline hover:bg-fundo"
+          >
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </Link>
+        </div>
+
         <div className="flex flex-1 flex-col gap-5 p-5">
           <div className="flex flex-wrap items-start gap-6">
             {/* Os dados do pedido, no lugar em que vão aparecer. */}
