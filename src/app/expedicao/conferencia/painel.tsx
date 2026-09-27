@@ -6,6 +6,7 @@ import { iniciarConferencia } from "./acoes";
 import { turnoDaMaquina } from "@/lib/estacao";
 import type { DivergenciaAberta, Lider } from "./divergencia";
 import { BlocoDoPedido } from "./itens";
+import { Anexos } from "./anexos";
 import {
   PainelEtiqueta,
   type ImpressaoDaEtiqueta,
@@ -108,7 +109,9 @@ export async function PainelDetalhe({
             etapa={etapa}
             liberacao={liberacao}
             etiqueta={etiqueta}
-            aba={aba === "timeline" ? "timeline" : "geral"}
+            aba={
+              aba === "timeline" ? "timeline" : aba === "anexos" ? "anexos" : "geral"
+            }
           />
         ) : (
           <div className="flex flex-1 items-center justify-center px-6 py-20">
@@ -135,7 +138,7 @@ async function Detalhe({
   etapa: Etapa;
   liberacao?: string;
   etiqueta?: string;
-  aba: "geral" | "timeline";
+  aba: "geral" | "anexos" | "timeline";
 }) {
   const supabase = await criarClienteServidor();
   const pedidos = pacote.envios?.pedidos ?? [];
@@ -221,6 +224,7 @@ async function Detalhe({
 
   const abas = [
     { chave: "geral", rotulo: "Geral" },
+    { chave: "anexos", rotulo: "Anexos" },
     { chave: "timeline", rotulo: "Timeline" },
   ] as const;
 
@@ -296,6 +300,8 @@ async function Detalhe({
 
       {aba === "timeline" ? (
         <Historico eventos={(eventos ?? []) as Evento[]} />
+      ) : aba === "anexos" ? (
+        <Anexos pacoteId={pacote.id} />
       ) : (
         <>
           <div className="pt-5" />
