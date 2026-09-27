@@ -8,7 +8,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * Livre, que não tem login no ZYNTRA. A porta daquela rota é o
  * `application_id` conferido dentro do banco, não a sessão.
  */
-const PUBLICAS = ["/entrar", "/auth", "/api/ml/notificacoes"];
+const PUBLICAS = ["/entrar", "/auth", "/api/ml/notificacoes", "/api/ml/etiquetas"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
