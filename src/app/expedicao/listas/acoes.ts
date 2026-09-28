@@ -18,16 +18,15 @@ import { criarClienteServidor } from "@/lib/supabase/server";
  * Quem gerou a lista fica gravado como separador — pelo LOGIN, não por PIN.
  * Quem separa usa o sistema; o PIN identifica só quem bipa os carros na porta.
  */
-export async function gerarLista(formData: FormData) {
+export async function gerarLista(destino: string, formData: FormData) {
   const ids = formData.getAll("pacote").map(String).filter(Boolean);
   if (ids.length === 0) return;
 
-  // Papel ou coletor. No papel os pedidos já saem para Conferir neste clique,
-  // como sempre foi; no coletor eles ficam em Separar até alguém fechar a
-  // separação no aparelho.
-  const modo = String(formData.get("modo") ?? "papel") === "coletor"
-    ? "coletor"
-    : "papel";
+  // O modo vem AMARRADO na ação, não num `name` do botão: o name/value do
+  // botão que submete não chega de forma confiável até uma Server Action, e
+  // o resultado disso foi uma lista de coletor nascendo como papel — com os
+  // pedidos indo para Conferir sem ninguém separar.
+  const modo = destino === "coletor" ? "coletor" : "papel";
 
   const supabase = await criarClienteServidor();
   const { data, error } = await supabase.rpc("criar_lista", {

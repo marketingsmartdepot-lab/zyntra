@@ -284,22 +284,20 @@ export function ListaPacotes({
         {podeListar && (
           <span className="flex flex-wrap items-center gap-2">
             <Botao
-              formAction={gerarLista}
+              formAction={gerarLista.bind(null, "papel")}
               trabalhando="Gerando…"
               className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
             >
               Gerar e imprimir
             </Botao>
 
-            <button
-              type="submit"
-              name="modo"
-              value="coletor"
-              formAction={gerarLista}
+            <Botao
+              formAction={gerarLista.bind(null, "coletor")}
+              trabalhando="Mandando…"
               className="rounded-lg border border-tinta px-4 py-[9px] text-[13px] font-semibold text-tinta"
             >
               Mandar pro coletor
-            </button>
+            </Botao>
           </span>
         )}
       </div>
