@@ -85,12 +85,68 @@ export default async function TelaDaSeparacao({
   const l = lista as Lista | null;
   const linhas = (itens ?? []) as Item[];
 
-  if (!l) {
+  // Nao achou, ou achou e a lista foi para o PAPEL: nos dois casos a pessoa
+  // esta com o aparelho na mao e precisa de um caminho, nao de um aviso. Entao
+  // a tela oferece as listas que estao mesmo em separacao.
+  if (!l || l.situacao !== "em_separacao") {
+    const { data: emAberto } = await supabase
+      .from("listas_separacao")
+      .select("id, codigo")
+      .eq("situacao", "em_separacao")
+      .order("criada_em", { ascending: false });
+
+    const abertas = (emAberto ?? []) as { id: string; codigo: string }[];
+
     return (
-      <Moldura titulo="Lista não encontrada">
-        <p className="text-[15px] text-suave">
-          Esta lista não existe mais.
+      <Moldura titulo={l ? `Lista ${l.codigo}` : "Lista não encontrada"}>
+        <p
+          className={`m-0 mb-4 rounded-[12px] border px-4 py-4 text-[15px] ${
+            r === "fechada"
+              ? "border-ok-linha bg-ok-bg font-semibold text-ok"
+              : "border-atencao-linha bg-atencao-bg text-atencao"
+          }`}
+        >
+          {!l
+            ? "Esta lista não existe. Confira o endereço."
+            : l.situacao === "concluida"
+              ? r === "fechada"
+                ? `Separação fechada. ${pedidos ?? ""} ${Number(pedidos ?? 0) === 1 ? "pedido foi" : "pedidos foram"} para Conferir.`
+                : "Esta separação já foi fechada."
+              : "Esta lista foi gerada para o papel, não para o coletor. Quem separa por papel não bipa aqui."}
         </p>
+
+        {abertas.length > 0 ? (
+          <>
+            <p className="m-0 mb-2 text-[13px] font-semibold text-suave">
+              Listas em separação agora:
+            </p>
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {abertas.map((x) => (
+                <li key={x.id}>
+                  <Link
+                    href={`/separacao/${x.id}`}
+                    className="block rounded-[12px] border border-linha bg-superficie px-4 py-4 text-[16px] font-semibold no-underline"
+                  >
+                    {x.codigo}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="m-0 text-[13.5px] leading-snug text-suave">
+            Nenhuma lista em separação agora. Elas aparecem aqui quando alguém
+            usa <b className="font-semibold">Mandar pro coletor</b> na aba
+            Separar.
+          </p>
+        )}
+
+        <Link
+          href="/expedicao?etapa=separar"
+          className="mt-4 block rounded-[12px] border border-linha px-4 py-4 text-center text-[15px] font-semibold no-underline"
+        >
+          Ir para Separar
+        </Link>
       </Moldura>
     );
   }
@@ -99,23 +155,6 @@ export default async function TelaDaSeparacao({
   const unidadesFeitas = linhas.reduce((t, i) => t + i.separado, 0);
   const unidadesTotal = linhas.reduce((t, i) => t + i.esperado, 0);
   const tudoVerde = linhas.length > 0 && feitos === linhas.length;
-
-  if (l.situacao === "concluida") {
-    return (
-      <Moldura titulo={`Lista ${l.codigo}`}>
-        <p className="m-0 rounded-[12px] border border-ok-linha bg-ok-bg px-4 py-5 text-center text-[16px] font-semibold text-ok">
-          Separação fechada.
-          {pedidos && ` ${pedidos} ${Number(pedidos) === 1 ? "pedido foi" : "pedidos foram"} para Conferir.`}
-        </p>
-        <Link
-          href="/expedicao?etapa=separar"
-          className="mt-4 block rounded-[12px] bg-tinta px-4 py-4 text-center text-[16px] font-semibold text-white no-underline"
-        >
-          Voltar para Separar
-        </Link>
-      </Moldura>
-    );
-  }
 
   const candidatos = (() => {
     if (r !== "ambiguo" || !entre) return [];
