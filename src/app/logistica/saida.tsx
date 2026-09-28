@@ -239,9 +239,14 @@ function Cartao({ saida }: { saida: SaidaResumo }) {
           valor={moeda(saida.total)}
           destaque
           nota={
-            saida.total > 0
-              ? "valores congelados no bipe"
-              : "esta modalidade não tem custo"
+            // Sem nenhum bipe não dá para afirmar nada sobre o custo. Dizer
+            // "esta modalidade não tem custo" numa saída Flex vazia é mentira,
+            // e mentira que só aparece quando alguém for conferir o mês.
+            saida.pacotes === 0
+              ? "nada bipado ainda"
+              : saida.total > 0
+                ? "valores congelados no bipe"
+                : "esta modalidade não tem custo"
           }
         />
       </div>
