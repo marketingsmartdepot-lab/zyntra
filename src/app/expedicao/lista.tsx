@@ -277,14 +277,30 @@ export function ListaPacotes({
           </span>
         )}
 
+        {/* Dois botões e não um seletor: o destino muda o que acontece com os
+            pedidos AGORA — no papel eles já vão para Conferir, no coletor
+            ficam esperando a separação fechar. Escolha dessas não deve ficar
+            escondida num menu que se esquece de trocar. */}
         {podeListar && (
-          <Botao
-            formAction={gerarLista}
-            trabalhando="Gerando a lista…"
-            className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
-          >
-            Gerar lista de separação
-          </Botao>
+          <span className="flex flex-wrap items-center gap-2">
+            <Botao
+              formAction={gerarLista}
+              trabalhando="Gerando…"
+              className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
+            >
+              Gerar e imprimir
+            </Botao>
+
+            <button
+              type="submit"
+              name="modo"
+              value="coletor"
+              formAction={gerarLista}
+              className="rounded-lg border border-tinta px-4 py-[9px] text-[13px] font-semibold text-tinta"
+            >
+              Mandar pro coletor
+            </button>
+          </span>
         )}
       </div>
     </form>
