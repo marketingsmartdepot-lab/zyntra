@@ -9,7 +9,6 @@ import { EstacaoDeSaida, type SaidaResumo } from "./saida";
 import { Fechamento } from "./fechamento";
 import { BancadaDeSaida } from "./bancada";
 import { turnoDaMaquina } from "@/lib/estacao";
-import { BancadaDoca } from "./bancada-doca";
 
 export const metadata = { title: "Logística — ZYNTRA" };
 
@@ -103,11 +102,6 @@ export default async function PaginaLogistica({
     0,
   );
 
-  const noCarrinho =
-    bipar === "1" && entregaId
-      ? ((entregas ?? []) as EntregaResumo[]).find((e) => e.id === entregaId)
-      : null;
-
   const naBancada =
     bipar === "1" && saidaId
       ? ((abertas as SaidaResumo[]).find((s) => s.id === saidaId) ?? null)
@@ -158,7 +152,7 @@ export default async function PaginaLogistica({
         explicacao={
           <>
             {aba === "doca" &&
-              "Tudo aqui já foi conferido e lacrado na Expedição. A doca não abre caixa — ela registra quem levou para fora."}
+              "Os carrinhos que chegaram da Expedição. Aqui ninguém bipa: o carrinho é a lista de separação e se enche sozinho ao finalizar cada conferência. O bipe é na Estação de saída."}
             {aba === "saida" &&
               "A segunda bipagem: contra a relação que sai pela porta, não contra o que o cliente comprou."}
             {aba === "fechamento" &&
@@ -192,21 +186,16 @@ export default async function PaginaLogistica({
       )}
 
       <div className="flex-1 bg-superficie">
-        {aba === "doca" &&
-          (noCarrinho ? (
-            <BancadaDoca
-              entregaId={noCarrinho.id}
-              codigo={noCarrinho.codigo}
-              entreguePor={noCarrinho.entregue_por}
-              jaBipados={noCarrinho.pacotes}
-            />
-          ) : (
-            <Doca
-              destinos={destinos ?? []}
-              entregas={(entregas ?? []) as EntregaResumo[]}
-              veValores={veValores}
-            />
-          ))}
+        {/* Na doca ninguém bipa. O carrinho se enche sozinho ao finalizar a
+            conferência, e o único bipe do fluxo é na Estação de saída, quando
+            a caixa vai da doca para o caminhão. */}
+        {aba === "doca" && (
+          <Doca
+            destinos={destinos ?? []}
+            entregas={(entregas ?? []) as EntregaResumo[]}
+            veValores={veValores}
+          />
+        )}
         {aba === "saida" &&
           (naBancada ? (
             <BancadaDeSaida

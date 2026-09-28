@@ -1,7 +1,5 @@
 import { moeda, quando } from "./formato";
-import Link from "next/link";
 import { abrirSaida } from "./acoes";
-import { AbrirCarrinho } from "./abrir-carrinho";
 
 export type Destino = {
   modalidade_id: string | null;
@@ -52,12 +50,7 @@ function EntregasDoDia({ entregas }: { entregas: EntregaResumo[] }) {
             </span>
             <span className="flex-1" />
             <span className="text-suave">{quando(e.entregue_em)}</span>
-            <Link
-              href={`/logistica?aba=doca&entrega=${e.id}&bipar=1`}
-              className="font-semibold text-tinta no-underline"
-            >
-              {e.e_uma_lista ? "Bipar o que faltou" : "Continuar bipando"}
-            </Link>
+
           </div>
         ))}
       </div>
@@ -84,10 +77,10 @@ export function Doca({
           </h2>
           <p className="mx-auto mt-3 max-w-[52ch] text-[14px] leading-relaxed text-suave">
             Só aparece aqui o que a Expedição entregar depois de conferido e
-            lacrado. É por este carrinho que a caixa chega.
+            lacrado. O carrinho é a lista de separação: ele se enche sozinho a
+            cada "Finalizar e próximo" na bancada.
           </p>
         </div>
-        <AbrirCarrinho />
         <EntregasDoDia entregas={entregas} />
       </div>
     );
@@ -95,8 +88,6 @@ export function Doca({
 
   return (
     <div className="flex flex-col gap-5 p-5">
-      <AbrirCarrinho />
-
       {destinos.map((d) => (
         <section
           key={d.modalidade_id ?? d.modalidade}
