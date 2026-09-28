@@ -132,8 +132,12 @@ export function BancadaDeSaida({
           htmlFor="saida-codigo"
           className="mb-2 block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
         >
-          Etiqueta
+          Etiqueta da caixa
         </label>
+        <p className="mb-2 text-[12px] text-suave">
+          No Flex é o <b className="font-semibold">QR code</b> — é o único
+          código que a etiqueta tem. Em Coleta e Agência, o código de barras.
+        </p>
         <input
           ref={campo}
           id="saida-codigo"
@@ -142,7 +146,7 @@ export function BancadaDeSaida({
           onChange={(e) => setLido(e.target.value)}
           disabled={ocupado}
           autoComplete="off"
-          placeholder="bipe aqui"
+          placeholder="bipe o QR ou o código de barras"
           className="w-full rounded-[10px] border-2 border-linha bg-superficie px-4 py-[18px] font-mono text-[22px] tracking-[-0.01em] outline-none focus-visible:border-tinta"
         />
       </form>
