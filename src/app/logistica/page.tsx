@@ -31,6 +31,8 @@ export default async function PaginaLogistica({
     bipar?: string;
     falha?: string;
     fechada?: string;
+    levados?: string;
+    recusados?: string;
   }>;
 }) {
   const supabase = await criarClienteServidor();
@@ -51,6 +53,8 @@ export default async function PaginaLogistica({
     bipar,
     falha,
     fechada,
+    levados,
+    recusados,
   } = await searchParams;
   // Fechamento pedido por quem não enxerga valores cai na Doca, não numa tela
   // branca: quem chegou por um link antigo precisa de um lugar para ficar.
@@ -163,6 +167,10 @@ export default async function PaginaLogistica({
         }
       />
 
+      {(levados !== undefined || recusados) && (
+        <Levados levados={levados} recusados={recusados} />
+      )}
+
       {falha && (
         <p className="shrink-0 border-b border-critico-linha bg-critico-bg px-5 py-[10px] text-[12.5px] font-semibold text-critico">
           {falha === "saida_vazia"
@@ -228,3 +236,68 @@ function mesAtual() {
   return m.charAt(0).toUpperCase() + m.slice(1);
 }
 
+/**
+ * O resultado de levar caixas marcadas para a doca.
+ *
+ * Existe porque eu tinha escrito o resultado no endereço e esquecido de
+ * mostrá-lo: ela marcava as caixas, clicava, e caía numa tela de bipe com o
+ * carrinho vazio, sem uma palavra sobre o que tinha acontecido.
+ *
+ * Recusa nomeia a caixa. Um número sozinho faria alguém empurrar o carrinho
+ * achando que levou tudo.
+ */
+function Levados({
+  levados,
+  recusados,
+}: {
+  levados?: string;
+  recusados?: string;
+}) {
+  const n = Number(levados ?? 0) || 0;
+
+  const lista = (() => {
+    if (!recusados) return [] as { codigo: string; motivo: string }[];
+    try {
+      return JSON.parse(recusados) as { codigo: string; motivo: string }[];
+    } catch {
+      return [];
+    }
+  })();
+
+  if (n === 0 && lista.length === 0) return null;
+
+  return (
+    <div
+      className={`shrink-0 border-b px-5 py-[10px] text-[12.5px] ${
+        lista.length === 0
+          ? "border-ok-linha bg-ok-bg text-ok"
+          : "border-atencao-linha bg-atencao-bg text-atencao"
+      }`}
+    >
+      <b className="font-semibold">
+        {n === 0
+          ? "Nenhuma caixa entrou no carrinho."
+          : `${n} ${n === 1 ? "caixa entrou" : "caixas entraram"} no carrinho.`}
+      </b>
+
+      {lista.length > 0 && (
+        <ul className="m-0 mt-1 list-none p-0">
+          {lista.map((r) => (
+            <li key={r.codigo}>
+              <span className="font-mono font-semibold">{r.codigo}</span> —{" "}
+              {r.motivo}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {lista.some((r) => r.motivo.includes("etiqueta")) && (
+        <p className="m-0 mt-[6px] leading-snug">
+          A etiqueta é confirmada bipando o papel na bancada, e quem confirma é
+          o agente de impressão — que só roda no Windows. Nesta máquina nenhuma
+          caixa vai passar por aqui.
+        </p>
+      )}
+    </div>
+  );
+}

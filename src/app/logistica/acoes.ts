@@ -102,8 +102,15 @@ export async function abrirEntregaDoca(formData: FormData) {
 
     // Recusa não pode virar número solto: quem empurra o carrinho precisa
     // saber QUAL caixa ficou para trás, com a pilha ainda na frente.
+    // Nada entrou? Não abre a tela de bipe. Carrinho vazio com um campo
+    // piscando faz a pessoa procurar defeito no leitor, quando o que houve
+    // foi uma recusa — que agora aparece escrita.
+    const entraram = p?.entraram ?? 0;
+
     redirect(
-      `/logistica?aba=doca&entrega=${r.entrega_id}&bipar=1&levados=${p?.entraram ?? 0}` +
+      `/logistica?aba=doca&entrega=${r.entrega_id}` +
+        (entraram > 0 ? "&bipar=1" : "") +
+        `&levados=${entraram}` +
         (recusados.length > 0
           ? `&recusados=${encodeURIComponent(JSON.stringify(recusados))}`
           : ""),
