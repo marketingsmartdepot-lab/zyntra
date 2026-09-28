@@ -1,6 +1,15 @@
 import Link from "next/link";
 import { hora, moeda, quando } from "./formato";
-import { fecharSaida } from "./acoes";
+import { abrirSaida, fecharSaida } from "./acoes";
+
+export type ModalidadeDeSaida = {
+  id: string;
+  nome: string;
+  /** Quantas caixas estão na doca esperando por este destino. */
+  na_doca: number;
+  /** Já existe uma saída aberta para este destino? */
+  ja_aberta: boolean;
+};
 
 export type SaidaResumo = {
   id: string;
@@ -17,34 +26,30 @@ export type SaidaResumo = {
 
 export function EstacaoDeSaida({
   saidas,
+  modalidades,
   veValores,
 }: {
   saidas: SaidaResumo[];
+  /** Os destinos que podem receber uma saída agora. */
+  modalidades: ModalidadeDeSaida[];
   /** Sem isto o total de cada saída não aparece. */
   veValores: boolean;
 }) {
   const abertas = saidas.filter((s) => s.situacao === "em_andamento");
   const fechadas = saidas.filter((s) => s.situacao !== "em_andamento");
 
-  if (saidas.length === 0) {
-    return (
-      <div className="flex h-full items-center justify-center px-6 py-20">
-        <div className="max-w-[52ch] text-center">
-          <h2 className="text-[20px] font-bold tracking-[-0.02em]">
-            Nenhuma saída aberta
-          </h2>
-          <p className="mt-3 text-[14px] leading-relaxed text-suave">
-            Uma saída reúne os pacotes de um destino e é onde acontece a segunda
-            bipagem. Ela é aberta a partir de um grupo da Doca, quando o
-            motorista chega.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-6 p-5">
+      <AbrirSaida modalidades={modalidades} />
+
+      {saidas.length === 0 && (
+        <p className="m-0 rounded-[9px] border border-linha px-4 py-10 text-center text-[13.5px] text-suave">
+          Nenhuma saída ainda hoje. Abra uma quando o motorista chegar: ela
+          reúne as caixas de um destino, e é nela que cada caixa é bipada ao ir
+          para o caminhão.
+        </p>
+      )}
+
       {abertas.length > 0 && (
         <section>
           <h3 className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave">
@@ -96,6 +101,89 @@ export function EstacaoDeSaida({
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * Abrir a saída aqui, e não só a partir da Doca.
+ *
+ * Antes só se abria pelo cartão de um destino na Doca — e quem vem à Estação
+ * de saída, que é onde o nome diz que isso acontece, encontrava um parágrafo
+ * mandando ir para outra aba. Pior: com a doca vazia não havia cartão nenhum,
+ * e a frente inteira parecia não existir.
+ */
+function AbrirSaida({ modalidades }: { modalidades: ModalidadeDeSaida[] }) {
+  const livres = modalidades.filter((m) => !m.ja_aberta);
+
+  return (
+    <section className="rounded-[9px] border border-linha">
+      <h3 className="m-0 border-b border-linha px-4 py-3 text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave">
+        Abrir uma saída
+      </h3>
+
+      {livres.length === 0 ? (
+        <p className="m-0 px-4 py-4 text-[12.5px] text-suave">
+          {modalidades.length === 0
+            ? "Nenhum destino cadastrado."
+            : "Todos os destinos já têm uma saída aberta. Feche a que está em andamento antes de abrir outra do mesmo destino."}
+        </p>
+      ) : (
+        <form
+          action={abrirSaida}
+          className="flex flex-wrap items-end gap-3 px-4 py-4"
+        >
+          <div>
+            <label
+              htmlFor="saida-modalidade"
+              className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+            >
+              Destino
+            </label>
+            <select
+              id="saida-modalidade"
+              name="modalidade"
+              className="rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
+            >
+              {livres.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nome}
+                  {m.na_doca > 0
+                    ? ` — ${m.na_doca} ${m.na_doca === 1 ? "caixa" : "caixas"} na doca`
+                    : " — nada na doca"}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="saida-motorista"
+              className="mb-[6px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+            >
+              Motorista
+            </label>
+            <input
+              id="saida-motorista"
+              name="motorista"
+              placeholder="quem veio buscar"
+              className="w-[220px] rounded-lg border border-linha bg-superficie px-3 py-[9px] text-[13.5px]"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
+          >
+            Abrir saída
+          </button>
+
+          <span className="max-w-[46ch] text-[12.5px] text-suave">
+            Uma saída por destino de cada vez. Depois é bipar a etiqueta de cada
+            caixa que entra no caminhão.
+          </span>
+        </form>
+      )}
+    </section>
   );
 }
 

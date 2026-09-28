@@ -5,7 +5,11 @@ import { Casca } from "@/components/casca";
 import { Barra, Indicador } from "@/components/barra";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Doca, type EntregaResumo } from "./doca";
-import { EstacaoDeSaida, type SaidaResumo } from "./saida";
+import {
+  EstacaoDeSaida,
+  type ModalidadeDeSaida,
+  type SaidaResumo,
+} from "./saida";
 import { Fechamento } from "./fechamento";
 import { BancadaDeSaida } from "./bancada";
 import { turnoDaMaquina } from "@/lib/estacao";
@@ -96,6 +100,34 @@ export default async function PaginaLogistica({
     .from("fechamento_custo_etiqueta")
     .select("total")
     .gte("dia", primeiroDia.toISOString().slice(0, 10));
+
+  // Os destinos para abrir saída. A contagem da doca vem junto porque escolher
+  // um destino vazio é escolher errado, e a tela deve dizer isso na hora.
+  const { data: modalidades } = await supabase
+    .from("modalidades")
+    .select("id, nome")
+    .eq("entra_na_esteira", true)
+    .order("nome");
+
+  const naDocaPorModalidade = new Map<string, number>();
+  for (const d of (destinos ?? []) as { modalidade_id: string | null; pacotes: number }[]) {
+    if (d.modalidade_id) naDocaPorModalidade.set(d.modalidade_id, d.pacotes);
+  }
+
+  const abertasPorModalidade = new Set(
+    ((saidas ?? []) as SaidaResumo[])
+      .filter((s) => s.situacao === "em_andamento")
+      .map((s) => s.modalidade),
+  );
+
+  const modalidadesDeSaida: ModalidadeDeSaida[] = (
+    (modalidades ?? []) as { id: string; nome: string }[]
+  ).map((m) => ({
+    id: m.id,
+    nome: m.nome,
+    na_doca: naDocaPorModalidade.get(m.id) ?? 0,
+    ja_aberta: abertasPorModalidade.has(m.nome),
+  }));
 
   const acumulado = ((doMes ?? []) as { total: number | string }[]).reduce(
     (t, l) => t + Number(l.total),
@@ -209,7 +241,11 @@ export default async function PaginaLogistica({
               veValores={veValores}
             />
           ) : (
-            <EstacaoDeSaida saidas={saidas ?? []} veValores={veValores} />
+            <EstacaoDeSaida
+              saidas={saidas ?? []}
+              modalidades={modalidadesDeSaida}
+              veValores={veValores}
+            />
           ))}
         {aba === "fechamento" && <Fechamento />}
       </div>
