@@ -448,7 +448,8 @@ function rotuloEtapa(e: string) {
     conferir: "Conferir",
     pronto: "Pronto pra envio",
     retido: "Retido",
-    encerrado: "Encerrado",
+    envio: "Envio",
+    enviado: "Enviado",
   };
   return nomes[e] ?? e;
 }
