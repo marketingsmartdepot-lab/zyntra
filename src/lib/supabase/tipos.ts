@@ -22,7 +22,6 @@ export type Etapa =
   | "separar"
   | "conferir"
   | "pronto"
-  | "envio"
   | "retido"
   | "enviado";
 
@@ -43,7 +42,7 @@ export const ABAS_EXPEDICAO = [
   { etapa: "separar", rotulo: "Separar" },
   { etapa: "conferir", rotulo: "Conferir" },
   { etapa: "pronto", rotulo: "Pronto pra envio" },
-  { etapa: "envio", rotulo: "Envio" },
+  { etapa: "enviado", rotulo: "Enviado" },
 ] as const satisfies ReadonlyArray<{ etapa: Etapa; rotulo: string }>;
 
 export type EtapaAba = (typeof ABAS_EXPEDICAO)[number]["etapa"];

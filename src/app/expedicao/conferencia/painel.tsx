@@ -433,7 +433,6 @@ function rotuloEtapa(e: string) {
     conferir: "Conferir",
     pronto: "Pronto pra envio",
     retido: "Retido",
-    envio: "Envio",
     enviado: "Enviado",
   };
   return mapa[e] ?? e;

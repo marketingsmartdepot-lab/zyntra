@@ -96,11 +96,10 @@ export default async function PaginaExpedicao({
   // "listas" não é etapa: a consulta de pacotes continua olhando Separar.
   const etapaAtiva: Etapa = vista === "listas" ? "separar" : vista;
 
-  // Contagem por etapa numa consulta só, em vez de uma por aba.
-  const { data: contagens } = await supabase
-    .from("pacotes")
-    .select("etapa")
-    .neq("etapa", "enviado");
+  // Contagem por etapa numa consulta só, em vez de uma por aba. Enviado entra
+  // na conta: a aba existe para mostrar o que já saiu, e excluir seria contar
+  // zero numa aba cheia.
+  const { data: contagens } = await supabase.from("pacotes").select("etapa");
 
   const porEtapa = new Map<string, number>();
   for (const linha of contagens ?? []) {
@@ -353,7 +352,7 @@ function Explicacao({ vista }: { vista: Vista }) {
       "Nota e etiqueta prontas. Gerar a lista imprime o papel e manda os pedidos para Conferir.",
     conferir: "Separado, esperando a bipagem na bancada.",
     pronto: "Conferido e lacrado, esperando a entrega na doca.",
-    envio: "No caminhão, com a saída ainda aberta. Fechar a saída manda para Enviado.",
+    enviado: "Saiu pela porta. O que está aqui já foi bipado na saída e não volta sozinho.",
     retido:
       "Fora da esteira: cancelamento, endereço trocado, modalidade alterada pelo canal.",
   };
@@ -416,11 +415,11 @@ function vazioDaEtapa(etapa: Etapa, temConta: boolean) {
     };
   }
 
-  if (etapa === "envio") {
+  if (etapa === "enviado") {
     return {
-      titulo: "Nenhuma caixa em envio",
+      titulo: "Nada enviado ainda",
       texto:
-        "Aqui ficam as caixas já bipadas na porta, enquanto a saída não fecha. Fechar a saída manda todas para Enviado, e elas saem da esteira.",
+        "As caixas chegam aqui ao serem bipadas na saída, na Logística. É o fim da esteira.",
     };
   }
 
