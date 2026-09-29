@@ -3,7 +3,6 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import type { Etapa } from "@/lib/supabase/tipos";
 import { Bancada, type ItemConferido } from "./bancada";
 import { iniciarConferencia } from "./acoes";
-import { turnoDaMaquina } from "@/lib/estacao";
 import type { DivergenciaAberta, Lider } from "./divergencia";
 import { BlocoDoPedido } from "./itens";
 import { FilaDePacotes, type PacoteNaFila } from "./fila";
@@ -84,7 +83,6 @@ async function Detalhe({
 }) {
   const supabase = await criarClienteServidor();
   const pedidos = pacote.envios?.pedidos ?? [];
-  const turno = await turnoDaMaquina();
 
   // O histórico de impressão da etiqueta decide o que a tela oferece:
   // imprimir, ou reimprimir exigindo motivo.

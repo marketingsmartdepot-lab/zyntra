@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { turnoDaMaquina } from "@/lib/estacao";
+import { estacaoDaMaquina } from "@/lib/estacao";
 
 /**
  * Abrir a conferência é MUTAÇÃO: cria a passagem pela bancada e congela o
@@ -12,15 +12,15 @@ import { turnoDaMaquina } from "@/lib/estacao";
  */
 export async function iniciarConferencia(pacoteId: string) {
   const supabase = await criarClienteServidor();
-  // Quem abriu a conferência fica registrado. Sem isso o histórico diz que
-  // aconteceu, mas não quem fez — e é justamente disso que se precisa no dia
-  // seguinte, quando alguém pergunta por que faltou uma unidade.
-  const turno = await turnoDaMaquina();
+
+  // Guarda EM QUAL BANCADA a caixa foi conferida. Quem conferiu já fica em
+  // concluida_por, pelo login — o turno de PIN deixou de existir.
+  const estacao = await estacaoDaMaquina();
 
   const { error } = await supabase.rpc("abrir_conferencia", {
     p_pacote_id: pacoteId,
-    p_estacao_id: turno?.estacaoId ?? null,
-    p_sessao_id: turno?.sessaoId ?? null,
+    p_estacao_id: estacao,
+    p_sessao_id: null,
   });
 
   if (error) {

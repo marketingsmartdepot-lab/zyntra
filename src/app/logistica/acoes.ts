@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { turnoDaMaquina } from "@/lib/estacao";
 
 /**
  * Abre a relação de saída de um destino.
@@ -72,11 +71,12 @@ export async function abrirEntregaDoca(formData: FormData) {
   }
 
   const supabase = await criarClienteServidor();
-  const turno = await turnoDaMaquina();
 
+  // O nome de quem leva é digitado neste formulário. O PIN identifica quem
+  // bipa na porta, não quem empurra o carrinho.
   const { data, error } = await supabase.rpc("abrir_entrega_doca", {
     p_entregue_por: nome,
-    p_operador_id: turno?.operadorId ?? null,
+    p_operador_id: null,
   });
 
   const r = Array.isArray(data) ? data[0] : data;

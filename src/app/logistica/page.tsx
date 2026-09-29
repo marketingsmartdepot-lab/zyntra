@@ -14,7 +14,6 @@ import {
 } from "./saida";
 import { Fechamento } from "./fechamento";
 import { BancadaDeSaida } from "./bancada";
-import { turnoDaMaquina } from "@/lib/estacao";
 
 export const metadata = { title: "Logística — ZYNTRA" };
 
@@ -98,7 +97,6 @@ export default async function PaginaLogistica({
 
   // A bancada só abre para uma saída que ainda aceita bipe. Uma já fechada
   // volta para a lista em vez de mostrar um leitor que não registra nada.
-  const turno = await turnoDaMaquina();
 
   // O acumulado do mês fica visível em toda aba da Logística: é o número que
   // vira dinheiro no fim do mês, e antes só aparecia se alguém clicasse em
