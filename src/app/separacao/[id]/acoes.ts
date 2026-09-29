@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { noAparelho } from "@/lib/operador";
 
 /** Um bipe no corredor. Volta para a mesma tela, com o resultado no endereço. */
 export async function biparSeparacao(formData: FormData) {
@@ -11,10 +12,13 @@ export async function biparSeparacao(formData: FormData) {
   if (!lista) return;
   if (!codigo) redirect(`/separacao/${lista}`);
 
+  const quem = await noAparelho();
+
   const supabase = await criarClienteServidor();
   const { data, error } = await supabase.rpc("bipar_separacao", {
     p_lista_id: lista,
     p_codigo: codigo,
+    p_operador_id: quem?.id ?? null,
   });
 
   const r = Array.isArray(data) ? data[0] : data;
@@ -45,10 +49,13 @@ export async function escolherNaSeparacao(formData: FormData) {
   const sku = String(formData.get("sku") ?? "");
   if (!lista || !sku) return;
 
+  const quem = await noAparelho();
+
   const supabase = await criarClienteServidor();
   const { data } = await supabase.rpc("somar_na_separacao", {
     p_lista_id: lista,
     p_sku_id: sku,
+    p_operador_id: quem?.id ?? null,
   });
 
   const r = Array.isArray(data) ? data[0] : data;

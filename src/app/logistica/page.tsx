@@ -1,4 +1,6 @@
 import { permissoesDeAgora } from "@/lib/permissoes";
+import { noAparelho } from "@/lib/operador";
+import { QuemEVoce } from "@/components/quem-e-voce";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Casca } from "@/components/casca";
@@ -36,6 +38,7 @@ export default async function PaginaLogistica({
     fechada?: string;
     levados?: string;
     recusados?: string;
+    quem?: string;
   }>;
 }) {
   const supabase = await criarClienteServidor();
@@ -44,6 +47,11 @@ export default async function PaginaLogistica({
   // Sem "Valores e custos" ela nem aparece na faixa: aba que abre e diz "não
   // pode" é pior que aba que não existe.
   const veValores = (await permissoesDeAgora()).has("ver_valores");
+
+  // Quem está no computador da porta, identificado por PIN. O bipe da saída
+  // fica no nome dessa pessoa — antes dependia de um turno de bancada que
+  // ninguém abria, e o bipe nascia sem dono.
+  const naPorta = await noAparelho();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -58,6 +66,7 @@ export default async function PaginaLogistica({
     fechada,
     levados,
     recusados,
+    quem,
   } = await searchParams;
   // Fechamento pedido por quem não enxerga valores cai na Doca, não numa tela
   // branca: quem chegou por um link antigo precisa de um lugar para ficar.
@@ -230,6 +239,7 @@ export default async function PaginaLogistica({
         )}
         {aba === "saida" &&
           (naBancada ? (
+            naPorta ? (
             <BancadaDeSaida
               saidaId={naBancada.id}
               codigo={naBancada.codigo}
@@ -237,9 +247,18 @@ export default async function PaginaLogistica({
               jaBipados={naBancada.pacotes}
               totalInicial={Number(naBancada.total)}
               aindaNaDoca={naBancada.na_doca}
-              operadorId={turno?.operadorId ?? null}
+              operadorId={naPorta.id}
               veValores={veValores}
             />
+            ) : (
+              /* Sem saber quem bipou, a minuta e o custo do Flex ficariam sem
+                 dono — e é justamente a conta que fecha o mês. */
+              <QuemEVoce
+                voltar={`/logistica?aba=saida&saida=${naBancada.id}&bipar=1`}
+                titulo="Estação de saída"
+                aviso={quem}
+              />
+            )
           ) : (
             <EstacaoDeSaida
               saidas={saidas ?? []}

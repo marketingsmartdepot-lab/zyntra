@@ -2,6 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { permissoesDeAgora } from "@/lib/permissoes";
+import { noAparelho } from "@/lib/operador";
+import { QuemEVoce } from "@/components/quem-e-voce";
+import { sairDoAparelho } from "@/app/identificar-acoes";
 import { CampoDoColetor } from "./campo";
 import {
   biparSeparacao,
@@ -55,10 +58,13 @@ export default async function TelaDaSeparacao({
     esp?: string;
     entre?: string;
     pedidos?: string;
+    quem?: string;
+    eu?: string;
   }>;
 }) {
   const { id } = await params;
-  const { r, codigo, nome, sep, esp, entre, pedidos } = await searchParams;
+  const { r, codigo, nome, sep, esp, entre, pedidos, quem, eu } =
+    await searchParams;
 
   const supabase = await criarClienteServidor();
   const {
@@ -68,6 +74,21 @@ export default async function TelaDaSeparacao({
 
   const pode = await permissoesDeAgora();
   if (!pode.has("ver_expedicao")) redirect("/");
+
+  // Quem está com o coletor. O aparelho fica logado com a conta da equipe; o
+  // PIN diz quem está no corredor agora. `eu` cobre o desenho logo após a
+  // identificação, quando o cookie recém-gravado ainda não é visível.
+  const operador = (await noAparelho()) ?? (eu ? { id: eu, nome: "" } : null);
+
+  if (!operador) {
+    return (
+      <QuemEVoce
+        voltar={`/separacao/${id}`}
+        titulo="Separação"
+        aviso={quem}
+      />
+    );
+  }
 
   const [{ data: lista }, { data: itens }] = await Promise.all([
     supabase
@@ -98,7 +119,11 @@ export default async function TelaDaSeparacao({
     const abertas = (emAberto ?? []) as { id: string; codigo: string }[];
 
     return (
-      <Moldura titulo={l ? `Lista ${l.codigo}` : "Lista não encontrada"}>
+      <Moldura
+        titulo={l ? `Lista ${l.codigo}` : "Lista não encontrada"}
+        quemEsta={operador.nome}
+        voltarPara={`/separacao/${id}`}
+      >
         <p
           className={`m-0 mb-4 rounded-[12px] border px-4 py-4 text-[15px] ${
             r === "fechada"
@@ -172,7 +197,11 @@ export default async function TelaDaSeparacao({
   })();
 
   return (
-    <Moldura titulo={`Lista ${l.codigo}`}>
+    <Moldura
+      titulo={`Lista ${l.codigo}`}
+      quemEsta={operador.nome}
+      voltarPara={`/separacao/${id}`}
+    >
       {/* -------------------------------------------------- o progresso */}
       <div className="mb-3 flex items-baseline gap-3">
         <span className="font-mono text-[34px] font-bold leading-none tabular-nums">
@@ -296,9 +325,14 @@ export default async function TelaDaSeparacao({
 function Moldura({
   titulo,
   children,
+  quemEsta,
+  voltarPara,
 }: {
   titulo: string;
   children: React.ReactNode;
+  /** O nome de quem está com o aparelho, quando já se identificou. */
+  quemEsta?: string;
+  voltarPara?: string;
 }) {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-[560px] flex-col bg-fundo px-3 py-3">
@@ -307,13 +341,18 @@ function Moldura({
           {titulo}
         </h1>
         <span className="flex-1" />
-        <Link
-          href="/expedicao?etapa=separar"
-          aria-label="Sair da separação"
-          className="rounded-lg border border-linha px-3 py-2 text-[13px] font-semibold text-suave no-underline"
-        >
-          Sair
-        </Link>
+        {quemEsta && (
+          <form action={sairDoAparelho}>
+            <input type="hidden" name="voltar" value={voltarPara} />
+            <button
+              type="submit"
+              title="Sair do aparelho"
+              className="rounded-lg border border-linha px-3 py-2 text-[13px] font-semibold text-suave"
+            >
+              {quemEsta} · sair
+            </button>
+          </form>
+        )}
       </header>
       {children}
     </main>
