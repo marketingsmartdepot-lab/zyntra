@@ -255,6 +255,8 @@ export default async function PaginaExpedicao({
                     ? "Nenhum pedido marcado."
                   : falha === "pacote_fora_de_separar"
                     ? "Só pacote em Separar entra em lista."
+                  : falha === "pacote_sem_sku_mapeado"
+                    ? "Tem anúncio sem SKU correspondente. Mapeie em Integração — sem SKU o produto não aparece na lista nem tem código para bipar."
                     : "Não foi possível gerar a lista."}
               </span>
             )}

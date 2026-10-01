@@ -11,6 +11,8 @@ type Resumo = {
   pacotes: number;
   unidades: number;
   contas: number;
+  /** `papel` ou `coletor`. Só a de coletor tem separador identificado. */
+  modo: string | null;
 };
 
 type Pedido = {
@@ -248,11 +250,15 @@ async function ListaAberta({
             {lista.contas} {lista.contas === 1 ? "conta" : "contas"}
           </p>
           <p className="mt-[2px] text-[12.5px] text-suave">
-            {/* O registro: quem estava no turno quando o papel saiu, e quem
-                clicou. Nem sempre são a mesma pessoa. */}
+            {/* Só a lista de coletor tem separador: ele se identifica por PIN
+                no aparelho. A de papel não pergunta nada a ninguém — dizer
+                "ninguém identificado" ali sugeriria uma falha que não existe. */}
             Separador:{" "}
             <b className="font-semibold text-tinta">
-              {lista.separador ?? "sem turno aberto na bancada"}
+              {lista.separador ??
+                (lista.modo === "coletor"
+                  ? "ninguém assumiu no coletor ainda"
+                  : "lista em papel — não registra quem separou")}
             </b>
             {lista.gerada_por && ` · gerada por ${lista.gerada_por}`}
           </p>

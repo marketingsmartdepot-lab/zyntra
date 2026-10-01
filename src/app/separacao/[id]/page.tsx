@@ -424,6 +424,10 @@ function Resposta({
     ja_completo: `${nome ?? codigo} já está completo.`,
     codigo_vazio: "Nada foi lido.",
     faltam_itens: "Ainda falta produto. A lista não fecha.",
+    // Produto sem SKU não tem código de barras, então não há como bipá-lo: a
+    // lista nunca ficaria verde. Quem resolve é a Integração, não o corredor.
+    itens_sem_sku:
+      "Tem produto sem SKU nesta lista. Avise a expedição — não dá para fechar.",
     lista_nao_esta_em_separacao: "Esta lista não está mais em separação.",
     erro: "Não foi possível registrar. Bipe de novo.",
   };
