@@ -94,19 +94,26 @@ Deno.serve(async (req) => {
     return responder(400, { ok: false, motivo: "modalidade_sem_etiqueta" });
   }
 
-  const { data: credencial } = await servico
-    .schema("privado")
-    .from("credenciais_conta")
-    .select("access_token, expira_em")
-    .eq("conta_id", pacote.conta_id)
-    .maybeSingle();
+  // O schema `privado` e SELADO: nenhum papel tem grant nas tabelas dele, nem
+  // a chave de servico. Ler privado.credenciais_conta pelo PostgREST daqui
+  // nunca funcionou — este caminho vinha devolvendo `conta_sem_credencial`
+  // sempre. Toda ponte para o `privado` e funcao `security definer`.
+  //
+  // De graca: token_do_canal RENOVA o token a cinco minutos do vencimento,
+  // entao a checagem de validade que havia aqui deixou de ser necessaria.
+  const { data: cred } = await servico.rpc("token_do_canal", {
+    p_conta_id: pacote.conta_id,
+  });
 
-  if (!credencial?.access_token) {
-    return responder(400, { ok: false, motivo: "conta_sem_credencial" });
-  }
+  const credencial = Array.isArray(cred) ? cred[0] : cred;
 
-  if (credencial.expira_em && new Date(credencial.expira_em) <= new Date()) {
-    return responder(400, { ok: false, motivo: "credencial_expirada" });
+  if (!credencial?.token) {
+    return responder(400, {
+      ok: false,
+      motivo: credencial?.motivo === "precisa_reconectar"
+        ? "conta_precisa_reconectar"
+        : "conta_sem_credencial",
+    });
   }
 
   // O ML devolve ZIP quando há mais de uma etiqueta e texto cru quando há uma
@@ -117,7 +124,7 @@ Deno.serve(async (req) => {
   try {
     const resposta = await fetch(
       `${ML}/shipment_labels?shipment_ids=${encodeURIComponent(envio.ref_externa)}&response_type=zpl2`,
-      { headers: { Authorization: `Bearer ${credencial.access_token}` } },
+      { headers: { Authorization: `Bearer ${credencial.token}` } },
     );
 
     if (!resposta.ok) {

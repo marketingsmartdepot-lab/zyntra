@@ -53,18 +53,20 @@ Deno.serve(async (req) => {
     return responder(403, { ok: false, motivo: "sem_permissao" });
   }
 
-  const { data: credencial } = await servico
-    .schema("privado")
-    .from("credenciais_erp")
-    .select("access_token, expira_em")
-    .maybeSingle();
+  // Mesma razao da etiqueta e da nota: o schema `privado` e selado, e ler
+  // privado.credenciais_erp pelo PostgREST nao funciona. token_do_erp e a
+  // ponte, e ja renova o token do Bling se estiver vencendo.
+  const { data: cred } = await servico.rpc("token_do_erp");
 
-  if (!credencial?.access_token) {
-    return responder(400, { ok: false, motivo: "sem_credencial" });
-  }
+  const credencial = Array.isArray(cred) ? cred[0] : cred;
 
-  if (credencial.expira_em && new Date(credencial.expira_em) <= new Date()) {
-    return responder(400, { ok: false, motivo: "credencial_expirada" });
+  if (!credencial?.token) {
+    return responder(400, {
+      ok: false,
+      motivo: credencial?.motivo === "precisa_reconectar"
+        ? "precisa_reconectar"
+        : "sem_credencial",
+    });
   }
 
   const total = {
@@ -86,7 +88,7 @@ Deno.serve(async (req) => {
         `${BLING}/produtos?pagina=${pagina}&limite=${POR_PAGINA}`,
         {
           headers: {
-            Authorization: `Bearer ${credencial.access_token}`,
+            Authorization: `Bearer ${credencial.token}`,
             Accept: "application/json",
           },
         },
