@@ -24,33 +24,70 @@ Deno.serve(async (req) => {
     return responder(405, { ok: false, motivo: "metodo_nao_suportado" });
   }
 
-  const autorizacao = req.headers.get("Authorization") ?? "";
-  if (!autorizacao.startsWith("Bearer ")) {
-    return responder(401, { ok: false, motivo: "sem_sessao" });
-  }
-
   const url = Deno.env.get("SUPABASE_URL")!;
-
-  const comoUsuario = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: autorizacao } },
-  });
-
-  const {
-    data: { user },
-  } = await comoUsuario.auth.getUser();
-
-  if (!user) return responder(401, { ok: false, motivo: "sem_sessao" });
-
   const servico = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-  const { data: perfil } = await servico
-    .from("perfis")
-    .select("ativo, papel")
-    .eq("id", user.id)
-    .maybeSingle();
+  // Duas portas, porque há dois chamadores legítimos e nenhum pode virar o
+  // outro.
+  //
+  // A TELA: um líder clicando "pedir a nota de novo", com sessão de usuário.
+  // Só esta porta pode `manual: true` — forçar por cima do desligado e da
+  // pausa é decisão de gente, com nome.
+  //
+  // O CRON: máquina falando com máquina, pelo segredo que já vive em
+  // privado.config (o mesmo que a rota da etiqueta usa). Nunca manual.
+  //
+  // Esta função é publicada com verify_jwt DESLIGADO, porque o cron não tem
+  // JWT de usuário. Então a autenticação é toda aqui: sem segredo válido e
+  // sem sessão válida, nada passa.
+  const segredoRecebido = req.headers.get("x-zyntra-segredo") ?? "";
+  let pelaMaquina = false;
 
-  if (!perfil?.ativo) {
-    return responder(403, { ok: false, motivo: "perfil_inativo" });
+  if (segredoRecebido) {
+    // O segredo é conferido DENTRO do banco e nunca sai de lá. O schema
+    // `privado` é selado — nenhum papel tem grant nas tabelas dele, nem a
+    // chave de serviço — então ler `privado.config` por aqui não funciona.
+    // Toda ponte para o `privado` é função `security definer`.
+    const { data: confere } = await servico.rpc("segredo_interno_confere", {
+      p_segredo: segredoRecebido,
+    });
+
+    if (confere !== true) {
+      return responder(401, { ok: false, motivo: "segredo_invalido" });
+    }
+
+    pelaMaquina = true;
+  }
+
+  let papel = "";
+
+  if (!pelaMaquina) {
+    const autorizacao = req.headers.get("Authorization") ?? "";
+    if (!autorizacao.startsWith("Bearer ")) {
+      return responder(401, { ok: false, motivo: "sem_sessao" });
+    }
+
+    const comoUsuario = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: autorizacao } },
+    });
+
+    const {
+      data: { user },
+    } = await comoUsuario.auth.getUser();
+
+    if (!user) return responder(401, { ok: false, motivo: "sem_sessao" });
+
+    const { data: perfil } = await servico
+      .from("perfis")
+      .select("ativo, papel")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!perfil?.ativo) {
+      return responder(403, { ok: false, motivo: "perfil_inativo" });
+    }
+
+    papel = String(perfil.papel);
   }
 
   let corpo: { pedido_id?: string; manual?: boolean };
@@ -65,9 +102,14 @@ Deno.serve(async (req) => {
   }
 
   // Forçar a emissão por cima do desligado ou da pausa é decisão de quem
-  // responde pela conta, não de qualquer operador.
+  // responde pela conta, não de qualquer operador — e nunca do cron.
   const manual = Boolean(corpo.manual);
-  if (manual && !["lider", "admin"].includes(String(perfil.papel))) {
+
+  if (manual && pelaMaquina) {
+    return responder(403, { ok: false, motivo: "maquina_nao_forca" });
+  }
+
+  if (manual && !["lider", "admin"].includes(papel)) {
     return responder(403, { ok: false, motivo: "sem_permissao_para_forcar" });
   }
 
@@ -99,6 +141,32 @@ Deno.serve(async (req) => {
     return responder(200, { ok: true, motivo: "ja_autorizada" });
   }
 
+  // Já `solicitada`: pedimos antes e não sabemos a resposta. O ML pode ter
+  // emitido do outro lado — é o caso que o `catch` de rede abaixo cria de
+  // propósito, deixando a nota em `solicitada` em vez de rejeitada.
+  //
+  // Mandar de novo aqui seria emitir a SEGUNDA nota do mesmo pedido, e o ML
+  // não cancela por API, só pelo painel. Então não se manda: quem cura esta
+  // linha é a varredura de notas, que atualiza a situação quando o ML
+  // responde (a chave de idempotência das duas pontas casa para isso), ou uma
+  // pessoa olhando o painel do ML. `marcar_notas_sem_resposta` dá rosto a
+  // isto na aba Aberto quando demora demais.
+  // O discriminador é o motivo que o banco devolveu, não a contagem de
+  // tentativas:
+  //   `ok`         -> a linha nasceu agora, ninguém falou com o ML ainda
+  //   `reenviada`  -> estava `rejeitada`, o ML já respondeu "não" — pode ir
+  //   `ja_existe`  -> já estava `solicitada`: é justamente o caso em que não
+  //                   sabemos se o ML emitiu. Este não vai.
+  if (nota?.situacao === "solicitada" && s.motivo === "ja_existe") {
+    return responder(200, {
+      ok: false,
+      motivo: "ja_solicitada",
+      detalhe:
+        "A nota já foi pedida e a resposta não voltou. Confira no painel do " +
+        "Mercado Livre antes de pedir de novo.",
+    });
+  }
+
   const { data: conta } = await servico
     .from("contas")
     .select("ref_externa")
@@ -109,19 +177,22 @@ Deno.serve(async (req) => {
     return responder(400, { ok: false, motivo: "conta_sem_id_do_canal" });
   }
 
-  const { data: credencial } = await servico
-    .schema("privado")
-    .from("credenciais_conta")
-    .select("access_token, expira_em")
-    .eq("conta_id", nota?.conta_id)
-    .maybeSingle();
+  // O token vem por função, pela mesma razão do segredo: `privado` é selado.
+  // E `token_do_canal` já RENOVA o token a cinco minutos do vencimento, então
+  // aqui não se checa validade — ou vem token bom, ou vem o motivo.
+  const { data: cred } = await servico.rpc("token_do_canal", {
+    p_conta_id: nota?.conta_id,
+  });
 
-  if (!credencial?.access_token) {
-    return responder(400, { ok: false, motivo: "conta_sem_credencial" });
-  }
+  const c = Array.isArray(cred) ? cred[0] : cred;
 
-  if (credencial.expira_em && new Date(credencial.expira_em) <= new Date()) {
-    return responder(400, { ok: false, motivo: "credencial_expirada" });
+  if (!c?.token) {
+    return responder(400, {
+      ok: false,
+      motivo: c?.motivo === "precisa_reconectar"
+        ? "conta_precisa_reconectar"
+        : "conta_sem_credencial",
+    });
   }
 
   let resposta: Response;
@@ -133,7 +204,7 @@ Deno.serve(async (req) => {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${credencial.access_token}`,
+          Authorization: `Bearer ${c.token}`,
           "Content-Type": "application/json",
         },
         // UMA venda por chamada. A API aceita "uma ou mais", e a regra

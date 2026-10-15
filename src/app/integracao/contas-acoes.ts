@@ -37,6 +37,45 @@ export async function alternarEmissao(formData: FormData) {
 }
 
 /**
+ * Diz qual empresa emite a nota desta conta.
+ *
+ * Faltava: a tela criava a empresa em Cadastros e mostrava qual estava
+ * amarrada, mas nenhum caminho GRAVAVA a amarração — todos só liam. Sem ela
+ * `solicitar_nota` recusa tudo com `faturador_nao_configurado` e devolve o
+ * pacote de Faturado para Aberto.
+ *
+ * É a empresa que decide CNPJ e série da nota, então trocar com pedido no
+ * meio do caminho troca o emissor do que ainda não foi emitido. Por isso a
+ * tela pede confirmação antes.
+ */
+export async function definirEmpresaEmissora(formData: FormData) {
+  const conta = String(formData.get("conta") ?? "");
+  const empresa = String(formData.get("empresa") ?? "");
+  if (!conta) return;
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase
+    .from("contas")
+    .update({ empresa_emissora_id: empresa || null })
+    .eq("id", conta);
+
+  revalidatePath("/integracao");
+  revalidatePath("/expedicao");
+
+  redirect(
+    `/integracao?aba=contas&falha=${
+      error
+        ? error.message.includes("row-level security")
+          ? "sem_permissao"
+          : "erro"
+        : empresa
+          ? "emissora_definida"
+          : "emissora_removida"
+    }`,
+  );
+}
+
+/**
  * Religa a emissão de uma conta que o disjuntor pausou.
  *
  * Não é só apertar o botão: o disjuntor pausou porque a mesma rejeição se

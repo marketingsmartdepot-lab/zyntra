@@ -1,6 +1,10 @@
 import { permissoesDeAgora } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { alternarEmissao, retomarEmissao } from "./contas-acoes";
+import {
+  alternarEmissao,
+  definirEmpresaEmissora,
+  retomarEmissao,
+} from "./contas-acoes";
 import { conectarConta } from "./ml-acoes";
 import { Botao } from "@/components/botao";
 
@@ -24,6 +28,8 @@ type LinhaConta = {
   emissao_pausa_motivo: string | null;
   ultimo_erro: string | null;
   canais: { nome: string; entra_na_esteira: boolean } | null;
+  /** O id cru, que o `select` precisa para marcar o que já está escolhido. */
+  empresa_emissora_id: string | null;
   empresas: {
     razao_social: string;
     serie_nfe: string | null;
@@ -46,12 +52,23 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
       `id, apelido, ref_externa, situacao, entra_na_esteira,
        emissao_automatica, emissao_pausada_em, emissao_pausa_motivo, ultimo_erro,
        canais ( nome, entra_na_esteira ),
+       empresa_emissora_id,
        empresas:empresa_emissora_id ( razao_social, serie_nfe, faturador_situacao ),
        pools_estoque:pool_estoque_id ( nome )`,
     )
     .order("apelido");
 
   const contas = (data ?? []) as unknown as LinhaConta[];
+
+  // As emissoras que existem, para o select. Só as ativas: amarrar uma conta
+  // a uma empresa desativada seria cadastrar um problema para daqui a um mês.
+  const { data: emp } = await supabase
+    .from("empresas")
+    .select("id, nome_curto, razao_social, serie_nfe, faturador_situacao")
+    .eq("ativa", true)
+    .order("nome_curto");
+
+  const empresas = (emp ?? []) as Emissora[];
 
   if (error) {
     return (
@@ -125,7 +142,13 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
                   )}
                 </Celula>
                 <Celula>{c.canais?.nome ?? "—"}</Celula>
-                <Celula>{c.empresas?.razao_social ?? "—"}</Celula>
+                <Celula>
+                  <Emissora
+                    conta={c}
+                    empresas={empresas}
+                    podeMexer={podeMexer}
+                  />
+                </Celula>
                 <Celula>{c.pools_estoque?.nome ?? "—"}</Celula>
                 <Celula>
                   {fora ? (
@@ -285,8 +308,18 @@ function ChaveDaEmissao({
 }
 
 function Resultado({ resultado }: { resultado: string }) {
-  const bom = ["emissao_ligada", "emissao_desligada", "emissao_retomada"];
+  const bom = [
+    "emissao_ligada",
+    "emissao_desligada",
+    "emissao_retomada",
+    "emissora_definida",
+    "emissora_removida",
+  ];
   const texto: Record<string, string> = {
+    emissora_definida:
+      "Emissora definida. É ela que decide o CNPJ e a série da nota desta conta.",
+    emissora_removida:
+      "Emissora removida. Sem emissora esta conta não fatura — os pedidos param em Aberto.",
     emissao_ligada:
       "Emissão automática ligada nesta conta. Acompanhe as primeiras notas antes de ligar a próxima.",
     emissao_desligada: "Emissão automática desligada nesta conta.",
@@ -411,5 +444,75 @@ function ResultadoMl({ ml }: { ml: string }) {
     >
       {bom ?? ruins[ml] ?? "Não foi possível concluir."}
     </p>
+  );
+}
+
+type Emissora = {
+  id: string;
+  nome_curto: string;
+  razao_social: string;
+  serie_nfe: string | null;
+  faturador_situacao: string;
+};
+
+/**
+ * Qual empresa emite a nota desta conta.
+ *
+ * Esta era a amarração que faltava: dava para criar a empresa em Cadastros e
+ * dava para ver qual estava amarrada, mas nenhuma tela gravava a amarração.
+ * Sem ela `solicitar_nota` recusa tudo com `faturador_nao_configurado`.
+ *
+ * O select já diz o que vem junto da escolha — a série e se o Faturador
+ * daquele CNPJ está ativo — porque é a série que não pode colidir com número
+ * que a Lexos já usou, e é o Faturador ativo que o diagnóstico exige para
+ * deixar o pedido seguir.
+ */
+function Emissora({
+  conta,
+  empresas,
+  podeMexer,
+}: {
+  conta: LinhaConta;
+  empresas: Emissora[];
+  podeMexer: boolean;
+}) {
+  const atual = conta.empresas?.razao_social ?? null;
+
+  if (!podeMexer) {
+    return <span className="text-[12.5px]">{atual ?? "—"}</span>;
+  }
+
+  if (empresas.length === 0) {
+    return (
+      <span className="text-[11.5px] text-suave">
+        Cadastre uma empresa emissora em Cadastros primeiro.
+      </span>
+    );
+  }
+
+  return (
+    <form action={definirEmpresaEmissora} className="flex flex-col gap-1">
+      <input type="hidden" name="conta" value={conta.id} />
+      <select
+        name="empresa"
+        defaultValue={conta.empresa_emissora_id ?? ""}
+        className="max-w-[200px] rounded-md border border-linha bg-superficie px-2 py-[5px] text-[12px]"
+      >
+        <option value="">— sem emissora —</option>
+        {empresas.map((e) => (
+          <option key={e.id} value={e.id}>
+            {e.nome_curto}
+            {e.serie_nfe ? ` · série ${e.serie_nfe}` : " · sem série"}
+            {e.faturador_situacao === "ativo" ? "" : " · faturador inativo"}
+          </option>
+        ))}
+      </select>
+      <button
+        type="submit"
+        className="self-start text-[11px] font-semibold text-suave underline underline-offset-2"
+      >
+        Salvar emissora
+      </button>
+    </form>
   );
 }
