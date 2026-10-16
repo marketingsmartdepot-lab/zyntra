@@ -1,6 +1,7 @@
 import { permissoesDeAgora } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import {
+  alternarBaixaEstoque,
   alternarEmissao,
   definirEmpresaEmissora,
   retomarEmissao,
@@ -24,6 +25,7 @@ type LinhaConta = {
   situacao: string;
   entra_na_esteira: boolean;
   emissao_automatica: boolean;
+  baixa_estoque_automatica: boolean;
   emissao_pausada_em: string | null;
   emissao_pausa_motivo: string | null;
   ultimo_erro: string | null;
@@ -50,7 +52,8 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
     .from("contas")
     .select(
       `id, apelido, ref_externa, situacao, entra_na_esteira,
-       emissao_automatica, emissao_pausada_em, emissao_pausa_motivo, ultimo_erro,
+       emissao_automatica, baixa_estoque_automatica,
+       emissao_pausada_em, emissao_pausa_motivo, ultimo_erro,
        canais ( nome, entra_na_esteira ),
        empresa_emissora_id,
        empresas:empresa_emissora_id ( razao_social, serie_nfe, faturador_situacao ),
@@ -108,6 +111,7 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
               "Estoque",
               "Faturador",
               "Emissão automática",
+              "Baixa no Bling",
               "Série",
               "Esteira",
               "Situação",
@@ -175,6 +179,15 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
                     </span>
                   ) : (
                     <ChaveDaEmissao conta={c} pausada={pausada} podeMexer={podeMexer} />
+                  )}
+                </Celula>
+                <Celula>
+                  {fora ? (
+                    <span className="text-[11.5px] text-suave">
+                      não se aplica
+                    </span>
+                  ) : (
+                    <ChaveDaBaixa conta={c} podeMexer={podeMexer} />
                   )}
                 </Celula>
                 <Celula>
@@ -307,8 +320,65 @@ function ChaveDaEmissao({
   );
 }
 
+/**
+ * A chave da baixa de estoque no Bling, por conta.
+ *
+ * Por conta e não geral porque o corte da Lexos é conta por conta. Com uma
+ * chave só, ligar causaria baixa dupla em toda conta que ainda não migrou: a
+ * Lexos mandando o pedido e o ZYNTRA mandando a saída da mesma peça.
+ *
+ * O aviso embaixo é o que importa na hora de clicar — é um movimento de
+ * estoque de verdade no Bling de produção, e errado se corrige na mão lá
+ * dentro.
+ */
+function ChaveDaBaixa({
+  conta,
+  podeMexer,
+}: {
+  conta: LinhaConta;
+  podeMexer: boolean;
+}) {
+  const ligada = conta.baixa_estoque_automatica;
+
+  const estado = ligada ? (
+    <Selo tom="ok">Ligada</Selo>
+  ) : (
+    <Selo tom="neutro">Desligada</Selo>
+  );
+
+  if (!podeMexer) return estado;
+
+  return (
+    <div>
+      <form action={alternarBaixaEstoque} className="flex items-center gap-2">
+        <input type="hidden" name="conta" value={conta.id} />
+        <input type="hidden" name="ligar" value={ligada ? "0" : "1"} />
+        {estado}
+        <button
+          type="submit"
+          className={
+            ligada
+              ? "rounded-lg border border-linha px-3 py-[6px] text-[12px] font-semibold text-suave"
+              : "rounded-lg bg-tinta px-3 py-[6px] text-[12px] font-semibold text-white"
+          }
+        >
+          {ligada ? "Desligar" : "Ligar"}
+        </button>
+      </form>
+      {!ligada && (
+        <p className="m-0 mt-[5px] max-w-[32ch] text-[11px] text-suave">
+          Ligue só depois que a Lexos parar de mandar os pedidos desta conta.
+          Os dois juntos baixam a mesma peça duas vezes.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Resultado({ resultado }: { resultado: string }) {
   const bom = [
+    "baixa_ligada",
+    "baixa_desligada",
     "emissao_ligada",
     "emissao_desligada",
     "emissao_retomada",
@@ -316,6 +386,10 @@ function Resultado({ resultado }: { resultado: string }) {
     "emissora_removida",
   ];
   const texto: Record<string, string> = {
+    baixa_ligada:
+      "Baixa no Bling ligada nesta conta. Vale para as vendas que chegarem agora — as que já entraram a Lexos baixou. Confirme que a Lexos parou de mandar os pedidos DESTA conta.",
+    baixa_desligada:
+      "Baixa no Bling desligada nesta conta. O que estava na fila dela também para.",
     emissora_definida:
       "Emissora definida. É ela que decide o CNPJ e a série da nota desta conta.",
     emissora_removida:

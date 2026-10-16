@@ -76,6 +76,43 @@ export async function definirEmpresaEmissora(formData: FormData) {
 }
 
 /**
+ * Liga e desliga a baixa de estoque no Bling de UMA conta.
+ *
+ * Uma de cada vez porque o corte da Lexos é conta por conta. Enquanto a Lexos
+ * ainda manda os pedidos de uma conta para o Bling, ligar esta chave faria os
+ * dois baixarem a mesma peça — e estoque errado no Bling se corrige na mão lá
+ * dentro.
+ *
+ * Só vale para vendas que chegarem DEPOIS de ligar. As que já entraram não
+ * são baixadas, e isso é de propósito: a Lexos já baixou aquelas.
+ */
+export async function alternarBaixaEstoque(formData: FormData) {
+  const conta = String(formData.get("conta") ?? "");
+  const ligar = String(formData.get("ligar") ?? "") === "1";
+  if (!conta) return;
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase
+    .from("contas")
+    .update({ baixa_estoque_automatica: ligar })
+    .eq("id", conta);
+
+  revalidatePath("/integracao");
+
+  redirect(
+    `/integracao?aba=contas&falha=${
+      error
+        ? error.message.includes("row-level security")
+          ? "sem_permissao"
+          : "erro"
+        : ligar
+          ? "baixa_ligada"
+          : "baixa_desligada"
+    }`,
+  );
+}
+
+/**
  * Religa a emissão de uma conta que o disjuntor pausou.
  *
  * Não é só apertar o botão: o disjuntor pausou porque a mesma rejeição se
