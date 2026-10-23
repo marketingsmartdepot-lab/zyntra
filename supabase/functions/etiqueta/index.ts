@@ -78,12 +78,18 @@ Deno.serve(async (req) => {
   // De qual envio é a etiqueta, e de qual conta é o token.
   const { data: pacote } = await servico
     .from("pacotes")
-    .select("conta_id, envios ( ref_externa, modalidades ( gera_etiqueta ) )")
+    .select(
+      "conta_id, envios ( ref_externa, etiqueta_conteudo, modalidades ( gera_etiqueta ) )",
+    )
     .eq("id", pacote_id)
     .maybeSingle();
 
   const envio = pacote?.envios as
-    | { ref_externa: string; modalidades: { gera_etiqueta: boolean } | null }
+    | {
+        ref_externa: string;
+        etiqueta_conteudo: string | null;
+        modalidades: { gera_etiqueta: boolean } | null;
+      }
     | null;
 
   if (!pacote || !envio?.ref_externa) {
@@ -94,6 +100,44 @@ Deno.serve(async (req) => {
     return responder(400, { ok: false, motivo: "modalidade_sem_etiqueta" });
   }
 
+  // ------------------------------------------------- a etiqueta que ja temos
+  //
+  // A etiqueta JA ESTA AQUI quando a caixa chega na bancada: dois cron de
+  // cinco em cinco minutos (`zyntra-etiquetas-pedir` e
+  // `zyntra-etiquetas-coletar`) baixam o ZPL do ML e guardam em
+  // `envios.etiqueta_conteudo` logo que o envio fica pronto para despacho.
+  // Dos 10 pacotes na esteira hoje, 10 tinham o ZPL guardado.
+  //
+  // Esta funcao ignorava isso e pedia ao ML de novo, toda vez. Dava para
+  // viver com isso enquanto a etiqueta saia de um clique numa tela; agora ela
+  // sai no bipe que fecha a caixa, e nesse momento o galpao nao pode ficar
+  // esperando a internet nem parar porque o ML esta fora. O papel que ele
+  // precisa esta a um SELECT de distancia.
+  //
+  // O `^XA` e o que faz um texto ser ZPL: sem ele a Zebra cospe lixo, e e a
+  // mesma checagem que vale para o que vem do ML mais abaixo.
+  const guardada = (envio.etiqueta_conteudo ?? "").trim();
+
+  if (guardada.includes("^XA")) {
+    const { data, error } = await servico.rpc("solicitar_impressao", {
+      p_tipo: "etiqueta",
+      p_conteudo: guardada,
+      p_pacote_id: pacote_id,
+      p_estacao_id: estacao_id,
+      p_operador_id: operador_id ?? null,
+      p_motivo_reimpressao: motivo_reimpressao ?? null,
+    });
+
+    if (error) {
+      return responder(500, { ok: false, motivo: "erro_ao_enfileirar" });
+    }
+
+    const r = Array.isArray(data) ? data[0] : data;
+    return responder(200, { ok: Boolean(r?.ok), motivo: r?.motivo ?? "erro" });
+  }
+
+  // ------------------------------- nao temos: buscar no ML na hora, como antes
+  //
   // O schema `privado` e SELADO: nenhum papel tem grant nas tabelas dele, nem
   // a chave de servico. Ler privado.credenciais_conta pelo PostgREST daqui
   // nunca funcionou — este caminho vinha devolvendo `conta_sem_credencial`
