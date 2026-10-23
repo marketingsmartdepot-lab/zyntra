@@ -100,12 +100,7 @@ export function Bancada({
   async function bipar(evento: React.FormEvent) {
     evento.preventDefault();
     const lido = codigo.trim();
-    // `finalizando` também barra: agora a caixa fecha no próprio bipe, e quem
-    // está com o leitor na mão bipa rápido. Um bipe que entra enquanto a
-    // conferência está sendo fechada bate numa conferência já concluída e
-    // volta como "não foi possível registrar a leitura" — erro assustador
-    // para uma leitura que nem devia ter sido tentada.
-    if (!lido || ocupado || finalizando) return;
+    if (!lido || ocupado) return;
 
     setOcupado(true);
     setErro(null);
