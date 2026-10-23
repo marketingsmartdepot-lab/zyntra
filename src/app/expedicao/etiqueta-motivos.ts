@@ -46,6 +46,14 @@ export const MOTIVOS_DA_ETIQUETA: Record<string, string> = {
   servico_indisponivel: "O serviço de etiquetas não respondeu. Tente de novo.",
   sem_sessao: "Sua sessão expirou. Entre de novo.",
   perfil_inativo: "Seu usuário está desativado.",
+  // Estes dois vinham cair no "Não foi possível imprimir a etiqueta", que foi
+  // exatamente a frase inútil que a bancada mostrou quando a impressão de
+  // etiqueta estourava no banco. Erro sem nome manda o operador bipar de novo
+  // para sempre.
+  erro_ao_enfileirar:
+    "A etiqueta não entrou na fila da impressora. É problema do sistema, não seu — chame quem cuida do ZYNTRA.",
+  operador_nao_informado:
+    "Não deu para saber quem pediu esta etiqueta. Saia e entre de novo no ZYNTRA.",
 };
 
 /** A frase para um motivo, inclusive os que o ML inventa na hora. */

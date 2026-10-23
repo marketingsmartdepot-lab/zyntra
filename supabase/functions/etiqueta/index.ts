@@ -10,6 +10,13 @@
  * Ter a chave de serviço significa passar por cima de toda a RLS — por isso
  * esta função faz a própria autorização antes de qualquer coisa, usando o JWT
  * de quem chamou.
+ *
+ * E é por ter a chave de serviço que ela enfileira por
+ * `solicitar_impressao_servico`, e não por `solicitar_impressao`: a segunda
+ * exige `auth.uid()`, que aqui é NULO. Chamar a errada foi o que manteve a
+ * impressão de etiqueta quebrada desde setembro — 500 em toda tentativa, e
+ * nenhuma etiqueta jamais enfileirada. A porta de serviço cobra em troca o
+ * `p_operador_id`, que é quem fica como dono da impressão.
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -119,12 +126,12 @@ Deno.serve(async (req) => {
   const guardada = (envio.etiqueta_conteudo ?? "").trim();
 
   if (guardada.includes("^XA")) {
-    const { data, error } = await servico.rpc("solicitar_impressao", {
+    const { data, error } = await servico.rpc("solicitar_impressao_servico", {
       p_tipo: "etiqueta",
       p_conteudo: guardada,
+      p_operador_id: operador_id ?? user.id,
       p_pacote_id: pacote_id,
       p_estacao_id: estacao_id,
-      p_operador_id: operador_id ?? null,
       p_motivo_reimpressao: motivo_reimpressao ?? null,
     });
 
@@ -195,12 +202,12 @@ Deno.serve(async (req) => {
     return responder(502, { ok: false, motivo: "resposta_nao_e_zpl" });
   }
 
-  const { data, error } = await servico.rpc("solicitar_impressao", {
+  const { data, error } = await servico.rpc("solicitar_impressao_servico", {
     p_tipo: "etiqueta",
     p_conteudo: zpl,
+    p_operador_id: operador_id ?? user.id,
     p_pacote_id: pacote_id,
     p_estacao_id: estacao_id,
-    p_operador_id: operador_id ?? null,
     p_motivo_reimpressao: motivo_reimpressao ?? null,
   });
 
