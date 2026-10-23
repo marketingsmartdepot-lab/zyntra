@@ -1,6 +1,5 @@
 import { imprimirEtiqueta } from "../etiqueta";
 import { textoDoMotivo } from "../etiqueta-motivos";
-import { ConfirmarEtiqueta } from "./confirmar-etiqueta";
 
 export type ImpressaoDaEtiqueta = {
   situacao: string;
@@ -14,9 +13,13 @@ export type ImpressaoDaEtiqueta = {
 /**
  * A etiqueta do canal saindo em papel.
  *
- * Fica na aba Pronto e não na bancada de conferência porque só depois da
- * conferência fechada faz sentido colar etiqueta numa caixa — antes disso, a
- * caixa ainda pode mudar de conteúdo.
+ * Hoje ela sai sozinha, no bipe que completa a caixa. Este painel é a
+ * segunda via: ver o que aconteceu e reimprimir quando o papel rasga.
+ *
+ * NÃO PEDE BIPE AQUI. O bipe da etiqueta é um só, na saída da doca, e é ele
+ * que carimba a confirmação — decisão da Daniele em 23/10. Pedir aqui também
+ * dobrava o gesto e, pior, travava a doca de uma caixa pronta e etiquetada
+ * sem ninguém entender o que faltava.
  *
  * Reimprimir exige motivo. Etiqueta é rastreada pelo canal: duas iguais
  * circulando é problema de verdade, e o motivo é o que explica a segunda.
@@ -36,11 +39,6 @@ export function PainelEtiqueta({
   );
   const ultimoErro = impressoes.find((i) => i.situacao === "erro");
   const confirmada = impressoes.find((i) => i.confirmada_em !== null);
-  // Só há o que confirmar quando a impressora aceitou o comando e ninguém
-  // bipou ainda.
-  const esperandoBipe = impressoes.some(
-    (i) => i.situacao === "impressa" && i.confirmada_em === null,
-  );
   const precisaMotivo =
     jaSaiu || resultado === "motivo_reimpressao_obrigatorio";
 
@@ -51,18 +49,19 @@ export function PainelEtiqueta({
           Etiqueta de envio
         </h3>
         {/*
-          A espera vem antes da confirmação: numa reimpressão a etiqueta
-          antiga está confirmada e a nova não, e dizer "confirmada" ali seria
-          mentira sobre o papel que está na mesa agora.
+          A fila vem antes de tudo: numa reimpressão a etiqueta antiga está
+          confirmada e a nova ainda está na fila, e dizer "confirmada" ali
+          seria mentira sobre o papel que está na mesa agora.
+
+          Não existe mais "Esperando confirmação": ninguém bipa etiqueta na
+          bancada, então esse estado seria uma cobrança sem dono.
         */}
         {naFila ? (
           <Selo tom="atencao">Na fila da impressora</Selo>
-        ) : esperandoBipe ? (
-          <Selo tom="atencao">Esperando confirmação</Selo>
         ) : confirmada ? (
-          <Selo tom="ok">Confirmada na mão</Selo>
+          <Selo tom="ok">Confirmada na saída</Selo>
         ) : jaSaiu ? (
-          <Selo tom="ok">Comando aceito</Selo>
+          <Selo tom="ok">Impressa</Selo>
         ) : (
           <Selo tom="neutro">Não impressa</Selo>
         )}
@@ -82,9 +81,9 @@ export function PainelEtiqueta({
         </p>
       )}
 
-      {confirmada && !esperandoBipe && (
+      {confirmada && (
         <p className="m-0 border-b border-linha px-4 py-[10px] text-[12.5px] text-suave">
-          Etiqueta bipada em{" "}
+          Etiqueta bipada na saída em{" "}
           {new Date(confirmada.confirmada_em!).toLocaleString("pt-BR", {
             dateStyle: "short",
             timeStyle: "short",
@@ -97,10 +96,6 @@ export function PainelEtiqueta({
             </>
           )}
         </p>
-      )}
-
-      {esperandoBipe && (
-        <ConfirmarEtiqueta pacoteId={pacoteId} />
       )}
 
       <form
