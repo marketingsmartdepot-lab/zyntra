@@ -37,7 +37,7 @@ import { join, dirname } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 
-const VERSAO = "agente 2.0";
+const VERSAO = "agente 2.1";
 const ESPERA_MS = 3000;
 
 /** A credencial da máquina mora aqui, fora da pasta do programa. */
@@ -180,20 +180,138 @@ async function instalarSeNecessario() {
     throw erro;
   }
 
-  await executar("schtasks", [
-    "/Create",
-    "/TN",
-    "ZYNTRA - Agente de impressao",
-    "/TR",
-    `"${alvo}"`,
-    "/SC",
-    "ONLOGON",
-    "/RL",
-    "LIMITED",
-    "/F",
+  // Duas tentativas, nesta ordem.
+  //
+  // A tarefa agendada é melhor: sobrevive a troca de usuário e aparece no
+  // Agendador, onde alguém de TI encontra. Mas em algumas máquinas criar
+  // tarefa ONLOGON exige elevação, e aí vem "Access is denied" — foi o que
+  // aconteceu na primeira bancada.
+  //
+  // A pasta Inicializar nunca pede permissão: é uma pasta do próprio usuário.
+  // Menos visível, mas funciona em qualquer máquina.
+  try {
+    await executar("schtasks", [
+      "/Create",
+      "/TN",
+      "ZYNTRA - Agente de impressao",
+      "/TR",
+      `"${alvo}"`,
+      "/SC",
+      "ONLOGON",
+      "/RL",
+      "LIMITED",
+      "/F",
+    ]);
+
+    registrar(`instalado em ${destino} — abre sozinho ao entrar no Windows`);
+    return;
+  } catch (erro) {
+    registrar(
+      `não consegui criar a tarefa agendada (${erro.message.trim()}) — ` +
+        "vou pela pasta Inicializar",
+    );
+  }
+
+  await porNaInicializacao(alvo);
+}
+
+/**
+ * Deixa o agente abrindo sozinho pela pasta Inicializar do usuário.
+ *
+ * Não pede permissão nenhuma — a pasta é do próprio usuário. O atalho é criado
+ * pelo PowerShell porque arquivo .lnk é formato binário do Windows e não se
+ * escreve à mão; e vai minimizado, para o operador não encontrar uma janela
+ * preta aberta toda vez que liga a máquina.
+ */
+async function porNaInicializacao(alvo) {
+  const pasta = join(
+    process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"),
+    "Microsoft",
+    "Windows",
+    "Start Menu",
+    "Programs",
+    "Startup",
+  );
+
+  mkdirSync(pasta, { recursive: true });
+
+  const atalho = join(pasta, "ZYNTRA Agente.lnk");
+
+  await executar("powershell", [
+    "-NoProfile",
+    "-Command",
+    `$a = (New-Object -ComObject WScript.Shell).CreateShortcut('${atalho}'); ` +
+      `$a.TargetPath = '${alvo}'; ` +
+      `$a.WorkingDirectory = '${dirname(alvo)}'; ` +
+      `$a.WindowStyle = 7; ` +
+      `$a.Description = 'Agente de impressao do ZYNTRA'; ` +
+      `$a.Save()`,
   ]);
 
-  registrar(`instalado em ${destino} — abre sozinho ao entrar no Windows`);
+  registrar(`instalado em ${dirname(alvo)} — abre minimizado ao entrar no Windows`);
+}
+
+/**
+ * Lê uma senha sem escrever nada na tela.
+ *
+ * `readline` ecoa cada tecla, e esse eco sobrevive no histórico da janela e em
+ * qualquer print que alguém tire. Em modo cru o terminal entrega tecla por
+ * tecla e nós não devolvemos nada — nem asterisco, que já entregaria o
+ * tamanho.
+ *
+ * Só APIs públicas: nada de mexer no `_writeToOutput` do readline, que é
+ * interno e muda de versão.
+ */
+function lerSenha(rotulo) {
+  stdout.write(rotulo);
+
+  return new Promise((resolve, reject) => {
+    let valor = "";
+
+    try {
+      stdin.setRawMode(true);
+    } catch (erro) {
+      // Sem modo cru não há como esconder. Melhor falhar do que ecoar a senha
+      // achando que escondeu.
+      stdout.write("\n");
+      reject(new Error("este terminal não permite digitar senha escondida"));
+      return;
+    }
+
+    stdin.resume();
+    stdin.setEncoding("utf8");
+
+    const aoDigitar = (tecla) => {
+      // Enter em qualquer sabor, ou fim de entrada.
+      if (tecla === "\r" || tecla === "\n" || tecla === "\u0004") {
+        stdin.removeListener("data", aoDigitar);
+        stdin.setRawMode(false);
+        stdin.pause();
+        stdout.write("\n");
+        resolve(valor);
+        return;
+      }
+
+      if (tecla === "\u0003") {
+        stdin.setRawMode(false);
+        stdout.write("\n");
+        process.exit(130);
+      }
+
+      if (tecla === "\u007f" || tecla === "\b") {
+        valor = valor.slice(0, -1);
+        return;
+      }
+
+      // Teclas de controle (setas, F1...) chegam como sequências que começam
+      // com escape. Entrariam na senha como lixo invisível.
+      if (tecla.charCodeAt(0) < 32) return;
+
+      valor += tecla;
+    };
+
+    stdin.on("data", aoDigitar);
+  });
 }
 
 async function primeiraVez() {
@@ -218,8 +336,12 @@ async function primeiraVez() {
   );
 
   const email = (await pergunta.question("  E-mail: ")).trim();
-  const senha = await pergunta.question("  Senha: ");
   pergunta.close();
+
+  // A senha NÃO passa pelo readline: ele ecoa o que se digita, e o eco fica no
+  // histórico da janela. Já aconteceu de a senha da dona aparecer num print de
+  // tela. Aqui o terminal entra em modo cru e nada é escrito de volta.
+  const senha = await lerSenha("  Senha: ");
   console.log("");
 
   if (!email || !senha) {
