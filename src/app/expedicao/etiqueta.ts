@@ -6,34 +6,37 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import { estacaoDaMaquina } from "@/lib/estacao";
 
 /**
- * Manda a etiqueta do Mercado Livre para a impressora da bancada.
+ * Pede a etiqueta do Mercado Livre e manda para a impressora da bancada.
  *
  * Quem fala com o ML é a Edge Function `etiqueta`, não este servidor: o token
  * do ML fica confinado lá, com a chave de serviço, e nunca passa pelo app nem
  * pelo navegador. Daqui sai só o pedido e volta só "deu certo" ou o motivo.
+ *
+ * Esta função NÃO redireciona e NÃO decide tela: ela só devolve o resultado.
+ * É chamada de dois lugares com necessidades opostas — do botão da aba Pronto,
+ * que navega, e do bipe que completa a caixa, que não pode navegar no meio da
+ * leitura.
  */
-export async function imprimirEtiqueta(formData: FormData) {
-  const pacoteId = String(formData.get("pacote") ?? "");
-  if (!pacoteId) return;
-
-  const motivoReimpressao = String(formData.get("motivo") ?? "").trim();
-
-  const voltar = (resultado: string) =>
-    redirect(`/expedicao?etapa=pronto&pacote=${pacoteId}&impressao_etiqueta=${resultado}`);
-
+export async function pedirEtiqueta({
+  pacoteId,
+  motivoReimpressao,
+}: {
+  pacoteId: string;
+  motivoReimpressao?: string | null;
+}): Promise<{ ok: boolean; motivo: string }> {
   const estacao = await estacaoDaMaquina();
-  if (!estacao) {
-    redirect(
-      `/bancada?destino=${encodeURIComponent(`/expedicao?etapa=pronto&pacote=${pacoteId}`)}`,
-    );
-  }
+
+  // Sem bancada não há impressora. Quem chama de um formulário manda a pessoa
+  // escolher a bancada; o bipe só mostra a frase, porque interromper a leitura
+  // com uma navegação seria pior.
+  if (!estacao) return { ok: false, motivo: "estacao_nao_informada" };
 
   const supabase = await criarClienteServidor();
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!session) return voltar("sem_sessao");
+  if (!session) return { ok: false, motivo: "sem_sessao" };
 
   let resposta: Response;
   try {
@@ -56,7 +59,7 @@ export async function imprimirEtiqueta(formData: FormData) {
       },
     );
   } catch {
-    return voltar("servico_indisponivel");
+    return { ok: false, motivo: "servico_indisponivel" };
   }
 
   const corpo = (await resposta.json().catch(() => null)) as {
@@ -64,6 +67,29 @@ export async function imprimirEtiqueta(formData: FormData) {
     motivo?: string;
   } | null;
 
+  return corpo?.ok
+    ? { ok: true, motivo: "ok" }
+    : { ok: false, motivo: corpo?.motivo ?? "erro" };
+}
+
+/** O botão da aba Pronto: imprime e volta para a tela com o resultado. */
+export async function imprimirEtiqueta(formData: FormData) {
+  const pacoteId = String(formData.get("pacote") ?? "");
+  if (!pacoteId) return;
+
+  const motivoReimpressao = String(formData.get("motivo") ?? "").trim();
+
+  const estacao = await estacaoDaMaquina();
+  if (!estacao) {
+    redirect(
+      `/bancada?destino=${encodeURIComponent(`/expedicao?etapa=pronto&pacote=${pacoteId}`)}`,
+    );
+  }
+
+  const r = await pedirEtiqueta({ pacoteId, motivoReimpressao });
+
   revalidatePath("/expedicao");
-  voltar(corpo?.ok ? "ok" : (corpo?.motivo ?? "erro"));
+  redirect(
+    `/expedicao?etapa=pronto&pacote=${pacoteId}&impressao_etiqueta=${r.motivo}`,
+  );
 }

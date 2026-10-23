@@ -1,4 +1,5 @@
 import { imprimirEtiqueta } from "../etiqueta";
+import { textoDoMotivo } from "../etiqueta-motivos";
 import { ConfirmarEtiqueta } from "./confirmar-etiqueta";
 
 export type ImpressaoDaEtiqueta = {
@@ -142,9 +143,9 @@ export function PainelEtiqueta({
 }
 
 /**
- * Cada recusa aponta para onde está o problema: no pedido do cliente, na
- * conta, na bancada ou no Mercado Livre. "Não foi possível" faria o operador
- * tentar de novo com a fila parada atrás dele.
+ * As frases vivem em `etiqueta-motivos`, porque a bancada de conferência
+ * também mostra estas recusas agora — a etiqueta sai no bipe que completa a
+ * caixa, e a recusa aparece lá, não aqui.
  */
 function Aviso({ resultado }: { resultado: string }) {
   if (resultado === "ok") {
@@ -154,43 +155,6 @@ function Aviso({ resultado }: { resultado: string }) {
       </p>
     );
   }
-
-  const texto: Record<string, string> = {
-    conta_sem_credencial:
-      "A conta deste pedido ainda não está conectada ao Mercado Livre. Conecte em Integração.",
-    credencial_expirada:
-      "A conexão com o Mercado Livre desta conta expirou. Reconecte em Integração.",
-    credencial_recusada:
-      "O Mercado Livre recusou a conexão desta conta. Reconecte em Integração.",
-    credencial_de_outra_conta:
-      "A credencial usada não é da conta dona deste pedido.",
-    envio_nao_liberado:
-      "O Mercado Livre ainda não liberou esta etiqueta. Ela só sai quando o envio fica pronto para despacho.",
-    envio_fulfillment:
-      "Envio Full: a etiqueta de venda é impressa pelo Mercado Livre, não por nós.",
-    envio_fora_do_me2:
-      "Este envio não é Mercado Envios 2, então não tem etiqueta para imprimir aqui.",
-    envio_nao_encontrado:
-      "O Mercado Livre não encontrou este envio.",
-    modalidade_sem_etiqueta:
-      "Esta modalidade não gera etiqueta — é envio combinado com o comprador.",
-    pacote_sem_envio: "Este pacote não tem envio associado.",
-    conferencia_nao_concluida:
-      "A conferência deste pacote ainda não foi fechada.",
-    motivo_reimpressao_obrigatorio:
-      "Esta etiqueta já foi impressa. Escreva o motivo da reimpressão.",
-    estacao_sem_impressora:
-      "Esta bancada não tem impressora cadastrada. Cadastre em Integração.",
-    agente_offline:
-      "O agente desta bancada não está respondendo. Sem ele o computador não fala com a impressora.",
-    resposta_nao_e_zpl:
-      "O Mercado Livre devolveu algo que não é etiqueta Zebra. Nada foi enviado para a impressora.",
-    ml_indisponivel:
-      "Não foi possível falar com o Mercado Livre agora. Tente de novo.",
-    servico_indisponivel:
-      "O serviço de etiquetas não respondeu. Tente de novo.",
-    perfil_inativo: "Seu usuário está desativado.",
-  };
 
   const tom =
     resultado === "motivo_reimpressao_obrigatorio" ? "atencao" : "critico";
@@ -204,10 +168,7 @@ function Aviso({ resultado }: { resultado: string }) {
           : "border-critico-linha bg-critico-bg text-critico"
       }`}
     >
-      {texto[resultado] ??
-        (resultado.startsWith("ml_")
-          ? `O Mercado Livre recusou: ${resultado.slice(3)}`
-          : "Não foi possível imprimir a etiqueta.")}
+      {textoDoMotivo(resultado)}
     </p>
   );
 }

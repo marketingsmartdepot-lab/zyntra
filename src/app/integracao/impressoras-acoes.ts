@@ -68,6 +68,30 @@ export async function criarBancada(formData: FormData) {
 }
 
 /**
+ * Manda uma etiqueta de teste, sem envolver pedido nenhum.
+ *
+ * Antes disto, provar que a térmica de uma bancada nova imprime exigia
+ * empurrar um pedido real pela esteira inteira — lista, separação,
+ * conferência fechada — e se não saísse papel, o erro podia estar em qualquer
+ * um dos seis passos. Aqui é um clique e um caminho só.
+ *
+ * A etiqueta sai com a bancada, o nome da impressora, a hora e quem pediu,
+ * mais um código de barras: dá para bipar e testar o coletor na mesma tira.
+ */
+export async function imprimirTeste(formData: FormData) {
+  const id = String(formData.get("impressora") ?? "");
+  if (!id) return encerrar("erro");
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc("imprimir_teste", {
+    p_impressora: id,
+  });
+
+  const r = Array.isArray(data) ? data[0] : data;
+  encerrar(error ? "erro" : r?.ok ? "teste_enviado" : (r?.motivo ?? "erro"));
+}
+
+/**
  * Tira uma máquina do sistema.
  *
  * A credencial dela morre junto — é assim que se resolve um computador

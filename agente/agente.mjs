@@ -31,13 +31,14 @@ import {
   writeFileSync,
   mkdirSync,
   unlinkSync,
+  renameSync,
 } from "node:fs";
 import { tmpdir, hostname, platform, homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 
-const VERSAO = "agente 2.1";
+const VERSAO = "agente 2.2";
 const ESPERA_MS = 3000;
 
 /** A credencial da máquina mora aqui, fora da pasta do programa. */
@@ -171,13 +172,41 @@ async function instalarSeNecessario() {
   try {
     copyFileSync(process.execPath, alvo);
   } catch (erro) {
-    // O Windows tranca o arquivo de um programa em execução. Se a cópia
-    // instalada já está aberta, ela é a que vale.
-    if (existsSync(alvo)) {
-      registrar("já havia uma cópia instalada em uso — mantida");
+    if (!existsSync(alvo)) throw erro;
+
+    // O Windows tranca o arquivo de um programa em execução, e a cópia
+    // instalada costuma estar rodando — ela sobe junto com a máquina.
+    //
+    // Antes eu desistia aqui e mantinha a versão antiga. Isso matava
+    // justamente o caminho de atualização: rodar o .exe novo é como uma
+    // versão nova chega à bancada, e ela chegava e era descartada em
+    // silêncio, com o agente dizendo "instalado".
+    //
+    // Executável EM USO pode ser renomeado no Windows — o processo continua
+    // lendo do arquivo renomeado — e aí a versão nova entra no lugar certo.
+    const velho = `${alvo}.antigo`;
+
+    try {
+      unlinkSync(velho);
+    } catch {
+      // Sobra da atualização anterior que não deu para apagar: o rename
+      // abaixo falha e o catch de fora conta o que houve.
+    }
+
+    try {
+      renameSync(alvo, velho);
+      copyFileSync(process.execPath, alvo);
+      registrar(
+        "versão instalada substituída pela nova — a antiga continua em " +
+          "execução até o próximo boot",
+      );
+    } catch (outro) {
+      registrar(
+        `não consegui substituir a cópia instalada (${outro.message.trim()}) ` +
+          "— a versão antiga continua valendo",
+      );
       return;
     }
-    throw erro;
   }
 
   // Duas tentativas, nesta ordem.
@@ -444,9 +473,19 @@ async function publicarImpressoras() {
     return;
   }
 
+  // A VERSÃO VIAJA AQUI, e não só no registro da máquina.
+  //
+  // `registrar_dispositivo` só roda no primeiro login — depois disso a
+  // credencial fica salva e o agente nunca mais se registra. Resultado: a
+  // tela mostrava para sempre a versão do dia da instalação. Aconteceu em
+  // 23/10, na primeira bancada: rodou a 2.1 e o ZYNTRA seguiu dizendo 2.0.
+  //
+  // Esta chamada acontece a cada vez que o agente sobe, então é por ela que
+  // a versão se atualiza.
   await rpc("publicar_impressoras", {
     p_token: cfg.token,
     p_impressoras: nomes.map((nome) => ({ nome })),
+    p_versao: VERSAO,
   });
 
   registrar(`${nomes.length} impressora(s) enviada(s): ${nomes.join(", ")}`);

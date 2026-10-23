@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { criarClienteNavegador } from "@/lib/supabase/client";
 import { concluirConferencia, reiniciarConferencia } from "./acoes";
+import { textoDoMotivo } from "../etiqueta-motivos";
 import {
   AbrirDivergencia,
   LiberarDivergencia,
@@ -21,7 +22,7 @@ export type ItemConferido = {
 };
 
 type Retorno = {
-  resultado: "ok" | "nao_pertence" | "excedente" | "desconhecido";
+  resultado: "ok" | "nao_pertence" | "excedente" | "desconhecido" | "ambiguo";
   sku: string | null;
   descricao: string | null;
   lidas: number;
@@ -30,11 +31,15 @@ type Retorno = {
   repetida: boolean;
 };
 
+// `ambiguo` existe no banco desde que a leitura passou a resolver código
+// repetido, e faltava aqui: sem esta linha `MENSAGEM[resultado]` vinha
+// `undefined` e a bancada quebrava na cara do operador no meio do turno.
 const MENSAGEM: Record<Retorno["resultado"], { titulo: string; tom: Tom }> = {
   ok: { titulo: "Leitura correta", tom: "ok" },
   nao_pertence: { titulo: "Item não pertence a este pacote", tom: "critico" },
   excedente: { titulo: "Unidade excedente", tom: "critico" },
   desconhecido: { titulo: "Código não cadastrado", tom: "atencao" },
+  ambiguo: { titulo: "Código em mais de um produto da caixa", tom: "atencao" },
 };
 
 type Tom = "ok" | "critico" | "atencao";
@@ -117,14 +122,37 @@ export function Bancada({
       if (!error) {
         const r = (Array.isArray(data) ? data[0] : data) as Retorno;
         setUltima(r);
-        if (r.resultado === "ok" && r.sku) {
-          setItens((atual) =>
-            atual.map((i) =>
-              i.sku_id === r.sku ? { ...i, quantidade_lida: r.lidas } : i,
-            ),
-          );
-        }
         setOcupado(false);
+
+        if (r.resultado === "ok" && r.sku) {
+          // `lidas`/`esperadas` que voltam do banco são DAQUELE SKU, não da
+          // caixa. O total da caixa só existe aqui, somando os itens — e tem
+          // que ser somado sobre a lista nova, não sobre o estado antigo, que
+          // o React ainda não atualizou.
+          const novos = itens.map((i) =>
+            i.sku_id === r.sku ? { ...i, quantidade_lida: r.lidas } : i,
+          );
+          setItens(novos);
+
+          const esperadasAgora = novos.reduce(
+            (t, i) => t + i.quantidade_esperada,
+            0,
+          );
+          const faltamAgora = novos.reduce(
+            (t, i) => t + Math.max(i.quantidade_esperada - i.quantidade_lida, 0),
+            0,
+          );
+
+          // ESTE bipe completou a caixa: fecha e manda a etiqueta, sem
+          // ninguém clicar em nada. Pedido de um produto sai no primeiro
+          // bipe; pedido de cinco sai no quinto.
+          //
+          // Com divergência aberta, não: ali a caixa não fecha sozinha nem
+          // com tudo bipado — quem libera é um líder, com o PIN dele.
+          if (faltamAgora <= 0 && esperadasAgora > 0 && !divergencia) {
+            finalizar();
+          }
+        }
         return;
       }
 
@@ -141,9 +169,22 @@ export function Bancada({
 
   function finalizar() {
     iniciarFinalizacao(async () => {
-      const r = await concluirConferencia(conferenciaId);
+      const r = await concluirConferencia(conferenciaId, pacoteId);
       if (!r.ok) {
         setErro(r.mensagem);
+        return;
+      }
+
+      // A caixa fechou e a etiqueta foi recusada. O operador PARA aqui: pular
+      // para a próxima esconderia uma caixa pronta sem etiqueta, e ela só
+      // apareceria de novo na doca, sem papel, com a fila andando.
+      if (r.etiqueta && !r.etiqueta.ok) {
+        setErro(
+          `Caixa conferida, mas a etiqueta não saiu. ${textoDoMotivo(
+            r.etiqueta.motivo,
+          )} A caixa está em Pronto — a etiqueta pode ser mandada de lá.`,
+        );
+        router.refresh();
         return;
       }
       // No modo bipagem, "próximo" é a caixa que a pessoa pegar na pilha, não

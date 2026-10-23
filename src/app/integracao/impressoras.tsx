@@ -4,6 +4,7 @@ import { Botao } from "@/components/botao";
 import {
   ajustarImpressora,
   criarBancada,
+  imprimirTeste,
   revogarMaquina,
 } from "./impressoras-acoes";
 import { AppDaBancada } from "./app-agente";
@@ -159,6 +160,7 @@ export async function Impressoras({ falha }: { falha?: string }) {
                           </td>
                           <td colSpan={4} className="border-b border-linha-suave px-4 py-2">
                             {podeMexer && (
+                              <div className="flex flex-col items-start gap-2">
                               <form
                                 action={ajustarImpressora}
                                 className="flex flex-wrap items-center gap-2"
@@ -216,6 +218,28 @@ export async function Impressoras({ falha }: { falha?: string }) {
                                   Salvar
                                 </Botao>
                               </form>
+
+                              {/*
+                                Só para a térmica em uso: o teste é uma tira de
+                                ZPL, e mandá-lo para uma impressora marcada
+                                como PDF sairia como lixo.
+                              */}
+                              {i.linguagem === "zpl" && i.ativa && (
+                                <form action={imprimirTeste}>
+                                  <input
+                                    type="hidden"
+                                    name="impressora"
+                                    value={i.id}
+                                  />
+                                  <Botao
+                                    trabalhando="Enviando…"
+                                    className="rounded-lg border border-linha px-3 py-[6px] text-[12.5px] font-semibold text-suave"
+                                  >
+                                    Imprimir etiqueta de teste
+                                  </Botao>
+                                </form>
+                              )}
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -337,11 +361,30 @@ function ComoInstalar({ compacto }: { compacto: boolean }) {
 }
 
 function Aviso({ resultado }: { resultado: string }) {
+  // O teste de impressão é o único caso de sucesso que volta para esta tela, e
+  // ele precisa voltar: "a tira saiu?" é a pergunta que a pessoa vai responder
+  // olhando a impressora, não a tela.
+  if (resultado === "teste_enviado") {
+    return (
+      <p className="m-0 rounded-[9px] border border-ok-linha bg-ok-bg px-4 py-3 text-[13px] font-semibold text-ok">
+        Etiqueta de teste enviada. Se ela saiu na impressora, esta bancada está
+        pronta para trabalhar.
+      </p>
+    );
+  }
+
   const texto: Record<string, string> = {
     sem_permissao: "Só um administrador mexe em máquinas e impressoras.",
     sem_nome: "Dê um nome à bancada.",
     maquina_nao_encontrada: "Essa máquina já não existe mais.",
     linguagem_invalida: "Escolha ZPL ou PDF.",
+    impressora_nao_encontrada: "Essa impressora já não existe mais.",
+    impressora_inativa:
+      "Esta impressora está marcada como “Não usar”. Ponha em uso e salve antes de testar.",
+    teste_so_em_zpl:
+      "O teste é uma etiqueta térmica. Numa impressora de papel comum ele sairia como lixo.",
+    agente_offline:
+      "O agente desta máquina não está respondendo. Sem ele o computador não fala com a impressora.",
     erro: "Não foi possível concluir.",
   };
 

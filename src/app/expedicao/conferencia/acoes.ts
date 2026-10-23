@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { estacaoDaMaquina } from "@/lib/estacao";
+import { pedirEtiqueta } from "../etiqueta";
 
 /**
  * Abrir a conferência é MUTAÇÃO: cria a passagem pela bancada e congela o
@@ -31,19 +32,50 @@ export async function iniciarConferencia(pacoteId: string) {
   return { ok: true, mensagem: null };
 }
 
-export async function concluirConferencia(conferenciaId: string) {
+/**
+ * Fecha a conferência e manda a etiqueta na mesma viagem.
+ *
+ * A etiqueta sai AQUI porque é aqui que a caixa fica pronta, e no galpão o
+ * gesto é um só: o operador bipa o último produto e a etiqueta cai na
+ * impressora. Era o contrário antes — fechava a conferência, e depois alguém
+ * tinha que ir até a aba Pronto e clicar. Decisão da Daniele em 23/10, depois
+ * de conferir uma caixa e nenhuma etiqueta sair.
+ *
+ * Os dois passos não são uma transação, e não podem ser: a etiqueta vem do
+ * Mercado Livre por HTTP. Então a ordem importa — fecha primeiro, imprime
+ * depois. Fechada sem etiqueta é recuperável (o botão da aba Pronto ainda
+ * está lá); etiqueta impressa de caixa que não fechou seria papel colado em
+ * caixa errada.
+ */
+export async function concluirConferencia(
+  conferenciaId: string,
+  pacoteId: string,
+) {
   const supabase = await criarClienteServidor();
 
   const { data, error } = await supabase.rpc("concluir_conferencia", {
     p_conferencia_id: conferenciaId,
   });
 
-  if (error) return { ok: false, mensagem: traduzir(error.message) };
+  if (error) {
+    return { ok: false, mensagem: traduzir(error.message), etiqueta: null };
+  }
 
   const r = Array.isArray(data) ? data[0] : data;
+
+  // Já estava fechada. Acontece de verdade: a leitura tem chave de
+  // idempotência, então um bipe reenviado pela rede volta com o mesmo
+  // `lidas`, a tela conclui que a caixa completou e tenta fechar de novo.
+  // Isso não é erro — a caixa está fechada e a etiqueta já foi pedida na
+  // primeira passagem. Pedir outra aqui só geraria "reimpressão sem motivo".
+  if (!r?.ok && r?.motivo === "conferencia_nao_aberta") {
+    return { ok: true, mensagem: null, etiqueta: null };
+  }
+
   if (!r?.ok) {
     return {
       ok: false,
+      etiqueta: null,
       mensagem:
         r?.motivo === "faltam_unidades"
           ? "Ainda faltam unidades na caixa."
@@ -53,8 +85,12 @@ export async function concluirConferencia(conferenciaId: string) {
     };
   }
 
+  const etiqueta = pacoteId
+    ? await pedirEtiqueta({ pacoteId })
+    : { ok: false, motivo: "erro" };
+
   revalidatePath("/expedicao");
-  return { ok: true, mensagem: null };
+  return { ok: true, mensagem: null, etiqueta };
 }
 
 /**
