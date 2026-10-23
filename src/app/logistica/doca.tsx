@@ -86,7 +86,16 @@ function EntregasDoDia({
                     lista de separação
                   </span>
                 )}
-                <span className="text-suave">{e.entregue_por}</span>
+                {/*
+                  Rotulado, e nao cinza solto. Entre o codigo do carrinho e a
+                  contagem de caixas, um nome sem rotulo nao se le como "quem
+                  levou" — e esse nome e justamente o que se procura quando
+                  uma caixa nao chega.
+                */}
+                <span className="text-suave">
+                  levado por{" "}
+                  <b className="font-semibold text-tinta">{e.entregue_por}</b>
+                </span>
                 <span className="text-suave">
                   {e.pacotes} {e.pacotes === 1 ? "caixa" : "caixas"}
                   {e.ja_sairam > 0 && ` · ${e.ja_sairam} já saíram`}
@@ -98,7 +107,7 @@ function EntregasDoDia({
                 </span>
               </Link>
 
-              {aberto && <PedidosDoCarrinho itens={itens} />}
+              {aberto && <PedidosDoCarrinho entrega={e} itens={itens} />}
             </div>
           );
         })}
@@ -229,17 +238,41 @@ export function Doca({
  * resumo conta as 6 caixas, e uma lista de 4 embaixo de um "6 caixas" faria
  * qualquer pessoa achar que perdeu duas.
  */
-function PedidosDoCarrinho({ itens }: { itens: ItemDoCarrinho[] }) {
+function PedidosDoCarrinho({
+  entrega,
+  itens,
+}: {
+  entrega: EntregaResumo;
+  itens: ItemDoCarrinho[];
+}) {
+  // O nome de quem levou se repete aqui de propósito: quem abriu a lista está
+  // lendo pedidos, e é nesse momento que a pergunta "quem estava com essa
+  // caixa?" aparece. Fazer a pessoa fechar o painel para reler o nome lá em
+  // cima é o tipo de ida e volta que faz ninguém usar a tela.
+  const cabecalho = (
+    <p className="m-0 border-b border-linha bg-fundo px-4 py-[9px] text-[12.5px] text-suave">
+      Levado para a doca por{" "}
+      <b className="font-semibold text-tinta">{entrega.entregue_por}</b>
+      {" · "}
+      {quando(entrega.entregue_em)}
+      {entrega.e_uma_lista && " · carrinho é a lista de separação"}
+    </p>
+  );
+
   if (itens.length === 0) {
     return (
-      <p className="m-0 rounded-b-lg border border-linha px-4 py-3 text-[12.5px] text-suave">
-        Este carrinho está vazio.
-      </p>
+      <div className="rounded-b-lg border border-linha">
+        {cabecalho}
+        <p className="m-0 px-4 py-3 text-[12.5px] text-suave">
+          Este carrinho está vazio.
+        </p>
+      </div>
     );
   }
 
   return (
     <div className="overflow-x-auto rounded-b-lg border border-linha">
+      {cabecalho}
       <table className="w-full border-collapse">
         <thead>
           <tr>
