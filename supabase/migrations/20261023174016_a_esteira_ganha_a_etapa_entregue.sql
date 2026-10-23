@@ -1,0 +1,19 @@
+-- A esteira ganha um fim de verdade: ENTREGUE.
+--
+-- Hoje "Enviado" junta tres coisas que o galpao enxerga diferente — caixa
+-- parada na agencia esperando o ML coletar, caixa em rota, e caixa que chegou
+-- no cliente. Sao 156 linhas num balaio so, e 138 delas sao historia morta.
+--
+-- Separando, Enviado passa a significar "saiu daqui e ainda nao chegou la" e
+-- cai para 18 linhas. Isso e exatamente a lista de vigia que faltava: caixa
+-- parada na agencia que o ML nunca coletou nao precisa de alerta nenhum —
+-- ela fica sozinha numa aba curta e pula aos olhos.
+--
+-- Aba de natureza diferente das outras, e vale dizer: ninguem TRABALHA em
+-- Entregue. As seis primeiras etapas sao trabalho de alguem; esta e palavra do
+-- Mercado Livre sobre uma caixa que o galpao nao controla mais.
+--
+-- Esta migracao faz SO o valor do enum: o Postgres nao deixa usar um valor
+-- novo na mesma transacao em que ele nasce, e o que vem depois precisa
+-- escrever 'entregue'::etapa.
+alter type public.etapa add value if not exists 'entregue' after 'enviado';

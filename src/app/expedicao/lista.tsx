@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Etapa, LinhaPacote } from "@/lib/supabase/tipos";
+import { ondeEstaNoCanal } from "@/lib/supabase/tipos";
 import { Botao } from "@/components/botao";
 import { gerarLista } from "./listas/acoes";
 import { tirarDoRetido } from "./retencao-acoes";
@@ -162,6 +163,24 @@ export function ListaPacotes({
                   <Selo tom="neutro">
                     {envio?.modalidades?.nome ?? "não classificada"}
                   </Selo>
+                  {/*
+                    Em Enviado e Entregue a modalidade sozinha não diz nada
+                    útil: o que se quer saber é ONDE a caixa está. Nas abas de
+                    trabalho não aparece, para não competir com o que o
+                    operador precisa olhar.
+                  */}
+                  {(vista === "enviado" || vista === "entregue") &&
+                    (() => {
+                      const onde = ondeEstaNoCanal(
+                        envio?.situacao_canal ?? null,
+                        envio?.substatus_canal ?? null,
+                      );
+                      return onde ? (
+                        <div className="mt-[2px] truncate text-[11.5px] text-suave">
+                          {onde}
+                        </div>
+                      ) : null;
+                    })()}
                 </Celula>
 
                 <Celula>

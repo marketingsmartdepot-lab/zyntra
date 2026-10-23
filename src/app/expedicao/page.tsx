@@ -25,6 +25,7 @@ export const metadata = { title: "Expedição — ZYNTRA" };
 const SELECAO = `
   id, etapa, etapa_desde, unidades_esperadas,
   envios ( ref_externa, limite_envio_em, etiqueta_obtida_em,
+           situacao_canal, substatus_canal,
            modalidades ( nome, gera_etiqueta ),
            pedidos ( ref_externa, pack_ref, comprador ) ),
   contas ( apelido,
@@ -354,7 +355,10 @@ function Explicacao({ vista }: { vista: Vista }) {
       "Nota e etiqueta prontas. Gerar a lista imprime o papel e manda os pedidos para Conferir.",
     conferir: "Separado, esperando a bipagem na bancada.",
     pronto: "Conferido e lacrado, esperando a entrega na doca.",
-    enviado: "Saiu pela porta. O que está aqui já foi bipado na saída e não volta sozinho.",
+    enviado:
+      "Saiu do galpão e ainda não chegou no cliente. Caixa parada aqui há dias é caixa que o canal não movimentou — vale olhar.",
+    entregue:
+      "O canal diz que chegou no cliente. Histórico: ninguém trabalha nesta aba.",
     retido:
       "Fora da esteira: cancelamento, endereço trocado, modalidade alterada pelo canal.",
   };
@@ -419,9 +423,17 @@ function vazioDaEtapa(etapa: Etapa, temConta: boolean) {
 
   if (etapa === "enviado") {
     return {
-      titulo: "Nada enviado ainda",
+      titulo: "Nada em trânsito",
       texto:
-        "As caixas chegam aqui ao serem bipadas na saída, na Logística. É o fim da esteira.",
+        "As caixas chegam aqui ao serem bipadas na saída, na Logística, e saem quando o canal avisa que chegaram no cliente.",
+    };
+  }
+
+  if (etapa === "entregue") {
+    return {
+      titulo: "Nada entregue ainda",
+      texto:
+        "As caixas chegam aqui sozinhas, quando o Mercado Livre avisa que foram entregues.",
     };
   }
 

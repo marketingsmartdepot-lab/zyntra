@@ -23,7 +23,8 @@ export type Etapa =
   | "conferir"
   | "pronto"
   | "retido"
-  | "enviado";
+  | "enviado"
+  | "entregue";
 
 export type BloqueioTipo =
   | "sem_nota"
@@ -43,6 +44,11 @@ export const ABAS_EXPEDICAO = [
   { etapa: "conferir", rotulo: "Conferir" },
   { etapa: "pronto", rotulo: "Pronto pra envio" },
   { etapa: "enviado", rotulo: "Enviado" },
+  // Última aba, e a única em que ninguém trabalha: "entregue" é palavra do
+  // canal sobre uma caixa que o galpão não controla mais. Ela existe para
+  // Enviado parar de ser um balaio — com ela, Enviado significa "saiu daqui e
+  // ainda não chegou lá", que é a lista que precisa de vigia.
+  { etapa: "entregue", rotulo: "Entregue" },
 ] as const satisfies ReadonlyArray<{ etapa: Etapa; rotulo: string }>;
 
 export type EtapaAba = (typeof ABAS_EXPEDICAO)[number]["etapa"];
@@ -72,6 +78,9 @@ export type LinhaPacote = {
     ref_externa: string;
     limite_envio_em: string | null;
     etiqueta_obtida_em: string | null;
+    /** O que o canal diz do transporte. É o que Enviado mostra no cartão. */
+    situacao_canal: string | null;
+    substatus_canal: string | null;
     modalidades: { nome: string; gera_etiqueta: boolean } | null;
     pedidos: {
       ref_externa: string;
@@ -98,3 +107,35 @@ export type LinhaPacote = {
   }[];
   bloqueios: { tipo: BloqueioTipo; causa: string | null }[];
 };
+
+/**
+ * Onde a caixa está, nas palavras de quem trabalha no galpão.
+ *
+ * O par status/substatus do Mercado Livre é vocabulário de API, não de
+ * pessoa: `ready_to_ship / dropped_off` quer dizer "deixei na agência e o ML
+ * ainda não coletou". A tradução mora aqui porque a aba Enviado existe para
+ * ser lida de relance.
+ *
+ * Os cinco casos abaixo são os que de fato aparecem nas contas da Smart Depot.
+ * Caso novo cai no `null` e o cartão não inventa nada — melhor não dizer que
+ * dizer errado.
+ */
+export function ondeEstaNoCanal(
+  status: string | null,
+  substatus: string | null,
+): string | null {
+  const s = status ?? "";
+  const sub = substatus ?? "";
+
+  // Agência XD: o status fica em `ready_to_ship` mesmo depois do despacho, e
+  // só o substatus conta que a caixa já saiu daqui.
+  if (sub === "dropped_off") return "no ponto de coleta";
+  if (sub === "out_for_delivery") return "saiu para entrega";
+  // XD: está na agência de DESTINO, esperando o comprador buscar. Se ele não
+  // buscar, volta — por isso não vira um "em rota" genérico.
+  if (sub === "waiting_for_withdrawal") return "aguardando o cliente retirar";
+  if (s === "shipped") return "coletado pelo canal";
+  if (s === "delivered") return "entregue";
+
+  return null;
+}
