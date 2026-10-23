@@ -116,26 +116,39 @@ export type LinhaPacote = {
  * ainda não coletou". A tradução mora aqui porque a aba Enviado existe para
  * ser lida de relance.
  *
- * Os cinco casos abaixo são os que de fato aparecem nas contas da Smart Depot.
- * Caso novo cai no `null` e o cartão não inventa nada — melhor não dizer que
- * dizer errado.
+ * SUBSTATUS DESCONHECIDO NÃO FICA EM BRANCO. Mostra o texto cru do ML, e a
+ * tela o exibe em fonte de código para ficar claro que é palavra de máquina.
+ * O branco custou caro: `in_hub` e `in_packing_list` apareceram horas depois
+ * de eu montar esta lista, nove cartões ficaram vazios, e a Daniele teve que
+ * perguntar "por que alguns não aparecem" em vez de me dizer o nome do estado
+ * novo. Estado novo tem que se denunciar sozinho — é por ele que a regra de
+ * `envio_saiu_do_galpao` descobre que precisa crescer.
  */
 export function ondeEstaNoCanal(
   status: string | null,
   substatus: string | null,
-): string | null {
-  const s = status ?? "";
-  const sub = substatus ?? "";
+): { texto: string; traduzido: boolean } | null {
+  const s = (status ?? "").trim();
+  const sub = (substatus ?? "").trim();
 
-  // Agência XD: o status fica em `ready_to_ship` mesmo depois do despacho, e
-  // só o substatus conta que a caixa já saiu daqui.
-  if (sub === "dropped_off") return "no ponto de coleta";
-  if (sub === "out_for_delivery") return "saiu para entrega";
+  if (!s && !sub) return null;
+
+  const diz = (texto: string) => ({ texto, traduzido: true });
+
+  // A cadeia da agência, na ordem em que acontece. Os três mantêm o status em
+  // `ready_to_ship`, e só o substatus conta que a caixa já saiu daqui.
+  if (sub === "dropped_off") return diz("no ponto de coleta");
+  if (sub === "in_packing_list") return diz("agrupada para coleta na agência");
+  if (sub === "in_hub") return diz("no centro do Mercado Livre");
+
+  if (sub === "out_for_delivery") return diz("saiu para entrega");
   // XD: está na agência de DESTINO, esperando o comprador buscar. Se ele não
   // buscar, volta — por isso não vira um "em rota" genérico.
-  if (sub === "waiting_for_withdrawal") return "aguardando o cliente retirar";
-  if (s === "shipped") return "coletado pelo canal";
-  if (s === "delivered") return "entregue";
+  if (sub === "waiting_for_withdrawal") return diz("aguardando o cliente retirar");
 
-  return null;
+  if (s === "shipped") return diz("coletado pelo canal");
+  if (s === "delivered") return diz("entregue");
+
+  // Sem tradução: entrega o que o ML disse, cru.
+  return { texto: sub ? `${s} / ${sub}` : s, traduzido: false };
 }

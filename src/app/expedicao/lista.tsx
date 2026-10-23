@@ -175,11 +175,25 @@ export function ListaPacotes({
                         envio?.situacao_canal ?? null,
                         envio?.substatus_canal ?? null,
                       );
-                      return onde ? (
-                        <div className="mt-[2px] truncate text-[11.5px] text-suave">
-                          {onde}
+                      if (!onde) return null;
+
+                      // Sem tradução vai em fonte de código: fica claro que é
+                      // palavra de máquina e não frase que alguém escreveu, e
+                      // quem vê sabe que tem um estado novo para nomear.
+                      return (
+                        <div
+                          className={`mt-[2px] truncate text-[11.5px] text-suave ${
+                            onde.traduzido ? "" : "font-mono text-[11px]"
+                          }`}
+                          title={
+                            onde.traduzido
+                              ? undefined
+                              : "Estado novo do canal, ainda sem tradução"
+                          }
+                        >
+                          {onde.texto}
                         </div>
-                      ) : null;
+                      );
                     })()}
                 </Celula>
 
