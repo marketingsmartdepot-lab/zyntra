@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { moeda, quando } from "./formato";
 import { abrirSaida } from "./acoes";
 
@@ -12,6 +13,19 @@ export type Destino = {
   prazo_mais_apertado: string | null;
 };
 
+export type ItemDoCarrinho = {
+  pacote_id: string;
+  etapa: string;
+  envio_ref: string | null;
+  conta: string | null;
+  modalidade: string;
+  /** Um pacote pode levar mais de um pedido: venda em pack do ML. */
+  pedidos: string | null;
+  comprador: string | null;
+  ja_saiu: boolean;
+  saiu_em: string | null;
+};
+
 export type EntregaResumo = {
   id: string;
   codigo: string;
@@ -23,7 +37,23 @@ export type EntregaResumo = {
   e_uma_lista: boolean;
 };
 
-function EntregasDoDia({ entregas }: { entregas: EntregaResumo[] }) {
+/**
+ * Os carrinhos do dia, e o que foi dentro deles.
+ *
+ * O resumo dizia "6 caixas" e nao dizia QUAIS — e quando uma caixa nao chega
+ * no cliente, "6 caixas" nao ajuda ninguem. Clicar no carrinho abre a lista
+ * dos pedidos que ele levou, inclusive os que ja sairam: o carrinho e o
+ * registro de quem estava com a caixa, e esse registro so serve completo.
+ */
+function EntregasDoDia({
+  entregas,
+  carrinhoAberto,
+  itens,
+}: {
+  entregas: EntregaResumo[];
+  carrinhoAberto: string | null;
+  itens: ItemDoCarrinho[];
+}) {
   if (entregas.length === 0) return null;
 
   return (
@@ -32,27 +62,46 @@ function EntregasDoDia({ entregas }: { entregas: EntregaResumo[] }) {
         Carrinhos de hoje
       </h3>
       <div className="flex flex-col gap-1">
-        {entregas.map((e) => (
-          <div
-            key={e.id}
-            className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-linha px-4 py-[9px] text-[12.5px]"
-          >
-            <span className="font-mono font-semibold">{e.codigo}</span>
-            {e.e_uma_lista && (
-              <span className="rounded-md border border-linha px-[8px] py-[2px] text-[11px] font-semibold text-suave">
-                lista de separação
-              </span>
-            )}
-            <span className="text-suave">{e.entregue_por}</span>
-            <span className="text-suave">
-              {e.pacotes} {e.pacotes === 1 ? "caixa" : "caixas"}
-              {e.ja_sairam > 0 && ` · ${e.ja_sairam} já saíram`}
-            </span>
-            <span className="flex-1" />
-            <span className="text-suave">{quando(e.entregue_em)}</span>
+        {entregas.map((e) => {
+          const aberto = carrinhoAberto === e.id;
 
-          </div>
-        ))}
+          return (
+            <div key={e.id}>
+              <Link
+                href={
+                  aberto
+                    ? "/logistica?aba=doca"
+                    : `/logistica?aba=doca&carrinho=${e.id}`
+                }
+                aria-expanded={aberto}
+                className={`flex flex-wrap items-center gap-x-4 gap-y-1 border border-linha px-4 py-[9px] text-[12.5px] no-underline ${
+                  aberto
+                    ? "rounded-t-lg border-b-0 bg-fundo"
+                    : "rounded-lg hover:bg-fundo"
+                }`}
+              >
+                <span className="font-mono font-semibold">{e.codigo}</span>
+                {e.e_uma_lista && (
+                  <span className="rounded-md border border-linha px-[8px] py-[2px] text-[11px] font-semibold text-suave">
+                    lista de separação
+                  </span>
+                )}
+                <span className="text-suave">{e.entregue_por}</span>
+                <span className="text-suave">
+                  {e.pacotes} {e.pacotes === 1 ? "caixa" : "caixas"}
+                  {e.ja_sairam > 0 && ` · ${e.ja_sairam} já saíram`}
+                </span>
+                <span className="flex-1" />
+                <span className="text-suave">{quando(e.entregue_em)}</span>
+                <span aria-hidden className="text-suave">
+                  {aberto ? "fechar" : "ver pedidos"}
+                </span>
+              </Link>
+
+              {aberto && <PedidosDoCarrinho itens={itens} />}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -62,11 +111,16 @@ export function Doca({
   veValores,
   destinos,
   entregas,
+  carrinhoAberto,
+  itensDoCarrinho,
 }: {
   /** Sem isto o custo previsto não aparece. */
   veValores: boolean;
   destinos: Destino[];
   entregas: EntregaResumo[];
+  /** Qual carrinho está com a lista de pedidos aberta, se algum. */
+  carrinhoAberto: string | null;
+  itensDoCarrinho: ItemDoCarrinho[];
 }) {
   if (destinos.length === 0) {
     return (
@@ -81,7 +135,11 @@ export function Doca({
             cada "Finalizar e próximo" na bancada.
           </p>
         </div>
-        <EntregasDoDia entregas={entregas} />
+        <EntregasDoDia
+          entregas={entregas}
+          carrinhoAberto={carrinhoAberto}
+          itens={itensDoCarrinho}
+        />
       </div>
     );
   }
@@ -155,7 +213,79 @@ export function Doca({
         </section>
       ))}
 
-      <EntregasDoDia entregas={entregas} />
+      <EntregasDoDia
+          entregas={entregas}
+          carrinhoAberto={carrinhoAberto}
+          itens={itensDoCarrinho}
+        />
+    </div>
+  );
+}
+
+/**
+ * Os pedidos que foram num carrinho.
+ *
+ * Mostra tambem os que ja sairam, com a marca de que sairam: o numero no
+ * resumo conta as 6 caixas, e uma lista de 4 embaixo de um "6 caixas" faria
+ * qualquer pessoa achar que perdeu duas.
+ */
+function PedidosDoCarrinho({ itens }: { itens: ItemDoCarrinho[] }) {
+  if (itens.length === 0) {
+    return (
+      <p className="m-0 rounded-b-lg border border-linha px-4 py-3 text-[12.5px] text-suave">
+        Este carrinho está vazio.
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-b-lg border border-linha">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr>
+            {["Pedido", "Comprador", "Conta", "Modalidade", "Envio", ""].map(
+              (c) => (
+                <th
+                  key={c}
+                  className="border-b border-linha px-4 py-[8px] text-left text-[10.5px] font-semibold uppercase tracking-[0.12em] text-suave"
+                >
+                  {c}
+                </th>
+              ),
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {itens.map((i) => (
+            <tr key={i.pacote_id}>
+              <td className="border-b border-linha-suave px-4 py-2 font-mono text-[12.5px]">
+                {i.pedidos ?? "—"}
+              </td>
+              <td className="border-b border-linha-suave px-4 py-2 text-[12.5px]">
+                {i.comprador ?? "—"}
+              </td>
+              <td className="border-b border-linha-suave px-4 py-2 text-[12.5px] text-suave">
+                {i.conta ?? "—"}
+              </td>
+              <td className="border-b border-linha-suave px-4 py-2 text-[12.5px] text-suave">
+                {i.modalidade}
+              </td>
+              <td className="border-b border-linha-suave px-4 py-2 font-mono text-[12px] text-suave">
+                {i.envio_ref ?? "—"}
+              </td>
+              <td className="border-b border-linha-suave px-4 py-2 text-right text-[11.5px]">
+                {i.ja_saiu ? (
+                  <span className="font-semibold text-ok">
+                    saiu{i.saiu_em ? ` · ${quando(i.saiu_em)}` : ""}
+                  </span>
+                ) : (
+                  <span className="text-suave">na doca</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Casca } from "@/components/casca";
 import { Barra, Indicador } from "@/components/barra";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { Doca, type EntregaResumo } from "./doca";
+import { Doca, type EntregaResumo, type ItemDoCarrinho } from "./doca";
 import {
   EstacaoDeSaida,
   type ModalidadeDeSaida,
@@ -32,6 +32,8 @@ export default async function PaginaLogistica({
     aba?: string;
     saida?: string;
     entrega?: string;
+    /** Carrinho aberto na aba Doca, para ver os pedidos que foram nele. */
+    carrinho?: string;
     bipar?: string;
     falha?: string;
     fechada?: string;
@@ -60,6 +62,7 @@ export default async function PaginaLogistica({
     aba: pedida,
     saida: saidaId,
     entrega: entregaId,
+    carrinho: carrinhoId,
     bipar,
     falha,
     fechada,
@@ -86,6 +89,16 @@ export default async function PaginaLogistica({
         .order("entregue_em", { ascending: false })
         .limit(20),
     ]);
+
+  // Os pedidos do carrinho aberto. Busca separada e so quando ha carrinho
+  // aberto: a aba Doca normal nao paga por uma consulta que ninguem pediu.
+  const { data: itensDoCarrinho } = carrinhoId
+    ? await supabase
+        .from("entregas_doca_itens")
+        .select("pacote_id, etapa, envio_ref, conta, modalidade, pedidos, comprador, ja_saiu, saiu_em")
+        .eq("entrega_id", carrinhoId)
+        .order("envio_ref")
+    : { data: null };
 
   const naDoca = (destinos ?? []).reduce(
     (t: number, d: { pacotes: number }) => t + d.pacotes,
@@ -233,6 +246,8 @@ export default async function PaginaLogistica({
             destinos={destinos ?? []}
             entregas={(entregas ?? []) as EntregaResumo[]}
             veValores={veValores}
+            carrinhoAberto={carrinhoId ?? null}
+            itensDoCarrinho={(itensDoCarrinho ?? []) as ItemDoCarrinho[]}
           />
         )}
         {aba === "saida" &&
