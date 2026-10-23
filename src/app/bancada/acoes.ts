@@ -6,8 +6,18 @@ import { revalidatePath } from "next/cache";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { COOKIE_ESTACAO } from "@/lib/estacao";
 
-export async function definirBancada(formData: FormData) {
-  const id = String(formData.get("estacao") ?? "").trim();
+/**
+ * Grava qual bancada é esta máquina.
+ *
+ * A bancada vem AMARRADA na ação, não num `name` do botão: o name/value de um
+ * botão de envio não chega de forma confiável numa Server Action, e o sintoma
+ * é o pior possível — a ação roda, não recebe nada, e volta calada. Quem
+ * clicou jura que escolheu, e a lateral segue dizendo "não escolhida".
+ *
+ * Mesmo erro que fazia "mandar pro coletor" gerar lista de papel.
+ */
+export async function definirBancada(estacaoId: string, formData: FormData) {
+  const id = String(estacaoId ?? "").trim();
   const destino = String(formData.get("destino") ?? "/expedicao");
   if (!id) return;
 

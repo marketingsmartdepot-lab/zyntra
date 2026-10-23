@@ -87,16 +87,13 @@ export default async function PaginaBancada({
               </a>
             </div>
           ) : (
-            <form action={definirBancada} className="mt-8 flex flex-col gap-2">
-              <input type="hidden" name="destino" value={paraOnde} />
-
+            <div className="mt-8 flex flex-col gap-2">
               {bancadas.map((b) => (
+                <form key={b.id} action={definirBancada.bind(null, b.id)}>
+                  <input type="hidden" name="destino" value={paraOnde} />
                 <button
-                  key={b.id}
                   type="submit"
-                  name="estacao"
-                  value={b.id}
-                  className={`flex items-center gap-4 rounded-[10px] border px-4 py-4 text-left ${
+                  className={`flex w-full items-center gap-4 rounded-[10px] border px-4 py-4 text-left ${
                     b.id === atual
                       ? "border-champanhe bg-grafite-2"
                       : "border-grafite-linha bg-grafite-2 hover:border-grafite-linha-2"
@@ -134,8 +131,9 @@ export default async function PaginaBancada({
                     <path d="m10 6 6 6-6 6" />
                   </svg>
                 </button>
+                </form>
               ))}
-            </form>
+            </div>
           )}
         </div>
       </div>
