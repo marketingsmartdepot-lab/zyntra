@@ -198,7 +198,11 @@ export function ListaPacotes({
                 </Celula>
 
                 <Celula>
-                  <Prazo limite={envio?.limite_envio_em ?? null} agora={agora} />
+                  <Prazo
+                    limite={envio?.limite_envio_em ?? null}
+                    agora={agora}
+                    jaSaiu={vista === "enviado" || vista === "entregue"}
+                  />
                 </Celula>
 
                 <Celula>
@@ -404,7 +408,28 @@ function Espera({ desde }: { desde: string }) {
   );
 }
 
-function Prazo({ limite, agora }: { limite: string | null; agora: number }) {
+/**
+ * O prazo de despacho do canal.
+ *
+ * `jaSaiu` existe porque vermelho tem um trabalho: dizer "corre". Em Enviado e
+ * Entregue não há o que correr — a caixa já foi — e pintar de vermelho as 142
+ * caixas de setembro fazia o vermelho perder o sentido em TODAS as abas,
+ * inclusive em Separar e Conferir, onde ele é o aviso que importa. O operador
+ * aprende a ignorar o que grita sempre.
+ *
+ * A data continua aparecendo: ela dá o contexto de quando a caixa devia ter
+ * saído. O que sai é o alarme, não a informação.
+ */
+function Prazo({
+  limite,
+  agora,
+  jaSaiu,
+}: {
+  limite: string | null;
+  agora: number;
+  /** A caixa já saiu do galpão? Então o prazo é história, não cobrança. */
+  jaSaiu?: boolean;
+}) {
   if (!limite) {
     return (
       <span className="text-[13px] font-semibold text-suave">
@@ -416,8 +441,8 @@ function Prazo({ limite, agora }: { limite: string | null; agora: number }) {
 
   const data = new Date(limite);
   const faltam = Math.round((data.getTime() - agora) / 60000);
-  const atrasado = faltam < 0;
-  const urgente = faltam >= 0 && faltam <= 120;
+  const atrasado = !jaSaiu && faltam < 0;
+  const urgente = !jaSaiu && faltam >= 0 && faltam <= 120;
 
   const hora = data.toLocaleTimeString("pt-BR", {
     hour: "2-digit",
@@ -431,11 +456,15 @@ function Prazo({ limite, agora }: { limite: string | null; agora: number }) {
     timeZone: "America/Sao_Paulo",
   });
 
-  const restante = atrasado
-    ? `atrasado ${Math.abs(faltam)} min`
-    : faltam < 60
-      ? `em ${faltam} min`
-      : dia;
+  // "atrasado" e "em X min" são cobranças, e cobrança só cabe em quem ainda
+  // está aqui. Para quem já saiu, a linha de baixo é só a data.
+  const restante = jaSaiu
+    ? dia
+    : atrasado
+      ? `atrasado ${Math.abs(faltam)} min`
+      : faltam < 60
+        ? `em ${faltam} min`
+        : dia;
 
   return (
     <span
