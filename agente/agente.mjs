@@ -38,7 +38,7 @@ import { join, dirname } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 
-const VERSAO = "agente 2.2";
+const VERSAO = "agente 2.3";
 const ESPERA_MS = 3000;
 
 /** A credencial da máquina mora aqui, fora da pasta do programa. */
@@ -100,6 +100,16 @@ async function principal() {
 
   registrar("online — aguardando trabalhos");
 
+  // A partir daqui a janela deixa de ser log corrido e passa a ser tela de
+  // status. Antes do laço não: instalação e primeiro login são uma sequência
+  // de passos que a pessoa precisa LER em ordem, e redesenhar apagaria o
+  // motivo de uma falha antes de alguém ter visto.
+  await atualizarSituacao();
+  tela.estado = "aguardando trabalhos";
+  desenhar();
+
+  let desdeASituacao = Date.now();
+
   while (!parando) {
     try {
       const trabalhos = await rpc("agente_reservar_trabalhos", {
@@ -107,31 +117,234 @@ async function principal() {
         p_limite: 5,
       });
 
+      tela.online = true;
+
       if (!Array.isArray(trabalhos) || trabalhos.length === 0) {
+        tela.estado = "aguardando trabalhos";
+
+        // A bancada e as impressoras mudam numa tela do ZYNTRA, não aqui.
+        // Reler de minuto em minuto é o bastante para a janela não mentir, e
+        // é barato: uma chamada por minuto por bancada.
+        if (Date.now() - desdeASituacao > 60_000) {
+          await atualizarSituacao();
+          desdeASituacao = Date.now();
+        }
+
+        desenhar();
         await dormir(ESPERA_MS);
         continue;
       }
 
       for (const t of trabalhos) {
+        tela.estado = `imprimindo ${t.tipo}`;
+        desenhar();
+
         try {
           await imprimir(t.impressora, t.conteudo, t.copias ?? 1, t.linguagem);
           await concluir(t.id, true);
-          registrar(`ok   ${t.tipo}  ${t.impressora}  (${t.linguagem ?? "zpl"})`);
+          anotar(t.tipo, t.impressora, "ok");
         } catch (erro) {
           const msg = erro instanceof Error ? erro.message : String(erro);
           await concluir(t.id, false, msg);
-          registrar(`ERRO ${t.tipo}  ${t.impressora}: ${msg}`);
+          anotar(t.tipo, t.impressora, msg);
         }
       }
+
+      tela.estado = "aguardando trabalhos";
+      desenhar();
     } catch (erro) {
       // Falha de rede não pode derrubar o agente: o galpão continua, e ele
       // volta a tentar no próximo ciclo.
-      registrar(`ciclo falhou, tentando de novo: ${erro.message}`);
+      tela.online = false;
+      tela.estado = `sem resposta do servidor — tentando de novo (${erro.message})`;
+      desenhar();
       await dormir(Math.max(ESPERA_MS, 5000));
     }
   }
 
   return 0;
+}
+
+// ------------------------------------------------------------------- a tela
+
+/**
+ * O que a janela mostra.
+ *
+ * Antes ela era um despejo de log: linha atrás de linha, e para saber se
+ * estava tudo bem alguém tinha que ler o rodapé e interpretar. Numa bancada de
+ * galpão isso não acontece — a janela fica minimizada e só é aberta quando
+ * algo já deu errado, e é nesse momento que ela precisa responder três coisas
+ * de relance: de qual bancada é esta máquina, se está falando com o servidor,
+ * e o que saiu por último.
+ */
+const tela = {
+  maquina: hostname(),
+  impressoras: [],
+  online: false,
+  estado: "iniciando",
+  naFila: 0,
+  /**
+   * "ok" | "recusada" | "?" — a credencial desta máquina ainda vale?
+   *
+   * Isto está aqui porque a primeira versão da tela dizia "online" com
+   * credencial inválida: o agente FALA com o servidor, então a rede está boa,
+   * mas a fila volta sempre vazia e nada imprime nunca. É o que acontece
+   * quando alguém usa "Remover máquina" no ZYNTRA — e ficaria assim, calado,
+   * até alguém perceber que a bancada parou de imprimir.
+   */
+  credencial: "?",
+  /** As últimas impressões, a mais recente primeiro. */
+  historico: [],
+};
+
+/** Quantas impressões a janela guarda. Cabe numa tela sem rolar. */
+const QUANTAS_LEMBRAR = 8;
+
+function anotar(tipo, impressora, resultado) {
+  tela.historico.unshift({
+    hora: new Date().toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: "America/Sao_Paulo",
+    }),
+    tipo,
+    impressora,
+    resultado,
+  });
+
+  tela.historico.length = Math.min(tela.historico.length, QUANTAS_LEMBRAR);
+
+  // Fora de terminal a tela não existe, e o histórico só vive na memória.
+  // Então o que aconteceu vai para o log, senão sumiria.
+  if (!ehTerminal()) {
+    registrar(
+      `${resultado === "ok" ? "ok  " : "ERRO"} ${tipo}  ${impressora}` +
+        (resultado === "ok" ? "" : `: ${resultado}`),
+    );
+  }
+}
+
+/** Pergunta ao ZYNTRA de qual bancada esta máquina é. */
+async function atualizarSituacao() {
+  try {
+    const r = await rpc("agente_situacao", { p_token: cfg.token });
+    const s = Array.isArray(r) ? r[0] : r;
+
+    if (!s?.ok) {
+      tela.credencial = s?.motivo === "credencial_invalida" ? "recusada" : "?";
+      return;
+    }
+
+    tela.credencial = "ok";
+    tela.maquina = s.maquina ?? hostname();
+    tela.impressoras = Array.isArray(s.impressoras) ? s.impressoras : [];
+    tela.naFila = s.na_fila ?? 0;
+    tela.online = true;
+  } catch {
+    // Não saber a bancada não impede imprimir. A tela mostra o que tem.
+  }
+}
+
+/**
+ * Terminal de verdade?
+ *
+ * Com a saída redirecionada para arquivo — que é o que acontece se alguém
+ * quiser um log — apagar a tela escreveria códigos de controle no meio do
+ * texto. Nesse caso o agente volta a ser log corrido.
+ */
+function ehTerminal() {
+  return Boolean(process.stdout.isTTY);
+}
+
+function desenhar() {
+  if (!ehTerminal()) return;
+
+  const l = [];
+  const campo = (rotulo, valor) => `  ${rotulo.padEnd(13)}${valor}`;
+
+  l.push("");
+  l.push(`  ZYNTRA · ${VERSAO}`);
+  l.push("  " + "─".repeat(58));
+  l.push(campo("Máquina", tela.maquina));
+
+  const emUso = tela.impressoras.filter((i) => i.ativa);
+  const bancadas = [...new Set(emUso.map((i) => i.bancada).filter(Boolean))];
+
+  l.push(
+    campo(
+      "Bancada",
+      bancadas.length > 0
+        ? bancadas.join(", ")
+        : "não definida — escolha em Integração no ZYNTRA",
+    ),
+  );
+
+  if (emUso.length === 0) {
+    l.push(campo("Impressora", "nenhuma em uso — defina em Integração"));
+  } else {
+    for (const [i, imp] of emUso.entries()) {
+      l.push(
+        campo(
+          i === 0 ? "Impressora" : "",
+          `${imp.nome}  (${(imp.linguagem ?? "zpl").toUpperCase()})`,
+        ),
+      );
+    }
+  }
+
+  // Credencial recusada ganha a linha inteira, e não um canto da linha de
+  // situação: é o único estado em que a bancada NUNCA vai imprimir e nada no
+  // galpão denuncia isso sozinho.
+  if (tela.credencial === "recusada") {
+    l.push(
+      campo(
+        "Situação",
+        "CREDENCIAL RECUSADA — esta máquina foi removida do ZYNTRA.",
+      ),
+    );
+    l.push(campo("", "Nada vai imprimir. Apague o arquivo de credencial"));
+    l.push(campo("", `(${ARQUIVO}) e abra o agente de novo para registrar.`));
+  } else {
+    l.push(
+      campo(
+        "Situação",
+        `${tela.online ? "online" : "SEM CONEXÃO"} · ${tela.estado}` +
+          (tela.naFila > 0 ? ` · ${tela.naFila} na fila` : ""),
+      ),
+    );
+  }
+
+  l.push(
+    campo(
+      "Atualizado",
+      new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+    ),
+  );
+
+  l.push("");
+
+  if (tela.historico.length === 0) {
+    l.push("  Nenhuma impressão ainda nesta sessão.");
+  } else {
+    l.push("  Últimas impressões");
+    for (const h of tela.historico) {
+      const ok = h.resultado === "ok";
+      l.push(
+        `  ${h.hora}  ${String(h.tipo).padEnd(10)}` +
+          `${String(h.impressora ?? "").slice(0, 28).padEnd(30)}` +
+          (ok ? "ok" : `ERRO — ${h.resultado}`),
+      );
+    }
+  }
+
+  l.push("");
+  l.push("  Pode deixar esta janela minimizada. Ctrl+C encerra o agente.");
+  l.push("");
+
+  // `\x1b[H` manda o cursor para o canto e `\x1b[2J` apaga: juntos redesenham
+  // sem o piscado de limpar e escrever em dois tempos.
+  process.stdout.write("\x1b[H\x1b[2J" + l.join("\n") + "\n");
 }
 
 // ------------------------------------------------------------ primeira vez
