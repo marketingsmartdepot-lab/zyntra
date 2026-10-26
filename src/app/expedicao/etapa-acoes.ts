@@ -80,3 +80,47 @@ export async function alterarEtapaDosMarcados(formData: FormData) {
 
   voltar(`ok_${r.mudaram}`, detalhe);
 }
+
+/**
+ * Pergunta ao Mercado Livre de novo o estado dos pedidos marcados.
+ *
+ * Existe por um defeito concreto: `pedir_etiquetas_ml` só pede a etiqueta
+ * quando a CÓPIA que o ZYNTRA tem do estado diz que dá (`ready_to_ship` +
+ * `ready_to_print`/`printed`). Se essa cópia estiver atrasada — aviso de
+ * webhook perdido, varredura parada — o ML já liberou a etiqueta e o ZYNTRA
+ * nem tenta pedir. E a condição não vira verdadeira sozinha: quem a
+ * atualizaria é justamente o aviso que se perdeu.
+ *
+ * Reprocessar refaz a cópia. NÃO pede etiqueta — quem pede é o cron de
+ * sempre, no minuto seguinte, agora que a condição dele é verdadeira. Uma
+ * função faz uma coisa.
+ */
+export async function reprocessarMarcados(formData: FormData) {
+  const vista = String(formData.get("vista") ?? "aberto");
+  const marcados = formData.getAll("pacote").map(String).filter(Boolean);
+
+  const voltar = (resultado: string) =>
+    redirect(`/expedicao?etapa=${vista}&reprocessado=${resultado}`);
+
+  if (marcados.length === 0) return voltar("nada_selecionado");
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc("reprocessar_pacotes", {
+    p_pacote_ids: marcados,
+  });
+
+  if (error) return voltar("erro");
+
+  const r = Array.isArray(data) ? data[0] : data;
+  if (!r?.ok) return voltar(r?.motivo ?? "erro");
+
+  revalidatePath("/expedicao");
+
+  // Os quatro números vão juntos: "olhei 12, 3 mudaram de estado, 1 saiu da
+  // esteira, 0 falharam" responde sozinho se valeu a pena e se algo deu
+  // errado. Só "pronto" mandaria a pessoa conferir linha por linha.
+  voltar(
+    `ok_${r.olhados ?? 0}_${r.atualizados ?? 0}_${r.moveram ?? 0}_${r.falhas ?? 0}` +
+      (r.motivo === "parou_no_limite_do_ml" ? "_limite" : ""),
+  );
+}

@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { Etapa, LinhaPacote } from "@/lib/supabase/tipos";
 import { ondeEstaNoCanal, ABAS_EXPEDICAO } from "@/lib/supabase/tipos";
-import { alterarEtapaDosMarcados } from "./etapa-acoes";
+import {
+  alterarEtapaDosMarcados,
+  reprocessarMarcados,
+} from "./etapa-acoes";
 import { Botao } from "@/components/botao";
 import { gerarLista } from "./listas/acoes";
 import { tirarDoRetido } from "./retencao-acoes";
@@ -47,6 +50,11 @@ export function ListaPacotes({
   // A engrenagem aparece em toda aba: alterar etapa à mão serve justamente
   // quando a caixa está onde não devia, e isso acontece em qualquer uma.
   const podeAlterarEtapa = liberado("alterar_etapa");
+  const podeReprocessar = liberado("reprocessar_pedido");
+  // A engrenagem existe se houver pelo menos uma ação dentro dela. Menu vazio
+  // é pior que menu ausente: a pessoa clica, não acha nada, e desconfia da
+  // tela inteira.
+  const temEngrenagem = podeAlterarEtapa || podeReprocessar;
   // A caixinha aparece em TODA aba, a pedido dela. Nas abas que ainda não têm
   // ação em massa ela não faz nada além de marcar — e é assim de propósito:
   // tirar a coluna de uma aba e pôr noutra faz o time procurar onde não tem.
@@ -272,7 +280,7 @@ export function ListaPacotes({
         enxergaria quais caixas estão marcadas, e o botão mandaria uma lista
         vazia sem dizer por quê.
       */}
-      {podeAlterarEtapa && (
+      {temEngrenagem && (
         <div className="flex items-center justify-end border-b border-linha bg-fundo px-5 py-[7px]">
           <details className="relative">
             <summary
@@ -295,6 +303,30 @@ export function ListaPacotes({
             </summary>
 
             <div className="absolute right-0 z-20 mt-2 w-[380px] rounded-[10px] border border-linha bg-superficie p-4 shadow-[0_10px_30px_rgba(17,25,28,.16)]">
+              {podeReprocessar && (
+                <div className={podeAlterarEtapa ? "mb-4 border-b border-linha pb-4" : ""}>
+                  <h3 className="m-0 text-[13.5px] font-bold tracking-[-0.01em]">
+                    Reprocessar pedido
+                  </h3>
+                  <p className="mb-3 mt-1 text-[12px] leading-relaxed text-suave">
+                    Pergunta ao Mercado Livre de novo o estado das caixas
+                    marcadas. Serve quando a etiqueta já está liberada lá e o
+                    ZYNTRA ainda não enxergou — depois disso ela desce sozinha,
+                    no próximo ciclo.
+                  </p>
+
+                  <Botao
+                    formAction={reprocessarMarcados}
+                    trabalhando="Perguntando ao ML…"
+                    className="w-full rounded-lg border border-tinta px-4 py-[9px] text-[13px] font-semibold text-tinta"
+                  >
+                    Reprocessar os marcados
+                  </Botao>
+                </div>
+              )}
+
+              {podeAlterarEtapa && (
+              <>
               <h3 className="m-0 text-[13.5px] font-bold tracking-[-0.01em]">
                 Alterar status do pedido
               </h3>
@@ -355,6 +387,8 @@ export function ListaPacotes({
               >
                 Alterar os marcados
               </Botao>
+              </>
+              )}
             </div>
           </details>
         </div>

@@ -363,12 +363,23 @@ export async function Equipe({ falha }: { falha?: string }) {
 
                   {/* --------------------------------------- o que pode */}
                   <td className="border-b border-linha-suave px-4 py-[10px]">
-                    <PermissoesDaPessoa
-                      pessoa={p.pessoa_id}
-                      papel={p.papel}
-                      marcadas={p.permissoes ?? []}
-                      possiveis={permissoes}
-                    />
+                    {/*
+                      Permissão é do LOGIN, não do PIN. Quem entra só por PIN
+                      não tem lista para escolher — e a tela oferecia uma, que
+                      falhava ao salvar com "Não foi possível concluir". Botão
+                      que aparece e não funciona ensina o time a desconfiar da
+                      tela inteira; foi o que aconteceu com o Givaldo.
+                    */}
+                    {p.perfil_id ? (
+                      <PermissoesDaPessoa
+                        pessoa={p.pessoa_id}
+                        papel={p.papel}
+                        marcadas={p.permissoes ?? []}
+                        possiveis={permissoes}
+                      />
+                    ) : (
+                      <SoBancada papel={p.papel} temPin={p.tem_pin} />
+                    )}
                   </td>
 
                   {/* ----------------------------------------- situação */}
@@ -495,6 +506,11 @@ function Aviso({ motivo }: { motivo: string }) {
     nao_tire_a_sua_propria:
       "Você não pode tirar a sua própria permissão de mexer nas pessoas — ficaria trancada do lado de fora.",
     pessoa_nao_encontrada: "Essa pessoa não existe mais.",
+    // O banco já devolvia este motivo por extenso; era a tela que não o
+    // traduzia e mostrava "Não foi possível concluir" — a frase que não
+    // ensina nada a quem está na frente dela.
+    so_bancada_nao_tem_permissao:
+      "Permissões são do login, e esta pessoa entra só por PIN. O que dá para escolher aqui é o papel: Operador ou Líder.",
     erro: "Não foi possível concluir.",
   };
 
@@ -510,5 +526,43 @@ function Aviso({ motivo }: { motivo: string }) {
     >
       {texto[motivo] ?? "Não foi possível concluir."}
     </p>
+  );
+}
+
+/**
+ * O que mostrar para quem entra só por PIN.
+ *
+ * A coluna dizia "Não pode nada ainda — escolher", e isso é mentira: a pessoa
+ * separa, confere e bipa na porta. O que ela não tem é lista de permissões,
+ * porque permissão abre TELA e quem abre tela é o login.
+ *
+ * O aparelho fica logado com uma conta da equipe, e as telas que ele alcança
+ * são as daquela conta. O PIN em cima disso responde outra pergunta: quem
+ * está com o aparelho na mão agora. É o que faz a separação sair assinada e o
+ * bipe da porta ter dono.
+ *
+ * Então o que dá para escolher aqui é o PAPEL, e ele muda uma coisa só.
+ */
+function SoBancada({ papel, temPin }: { papel: string; temPin: boolean }) {
+  return (
+    <div className="flex flex-col gap-[3px]">
+      <span className="text-[12.5px] font-semibold">
+        Entra por PIN · {papel === "lider" ? "Líder" : "Operador"}
+      </span>
+      <span className="text-[11.5px] leading-relaxed text-suave">
+        {papel === "lider"
+          ? "Separa, confere, bipa na porta e libera divergência."
+          : "Separa, confere e bipa na porta."}
+      </span>
+      <span className="text-[11.5px] leading-relaxed text-suave">
+        Sem login não há permissões a escolher: elas abrem telas, e o PIN diz
+        quem está no aparelho.
+      </span>
+      {!temPin && (
+        <span className="text-[11.5px] font-semibold text-atencao">
+          Falta definir o PIN — sem ele não consegue se identificar.
+        </span>
+      )}
+    </div>
   );
 }

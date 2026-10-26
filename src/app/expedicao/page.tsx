@@ -52,6 +52,8 @@ export default async function PaginaExpedicao({
     /** Resultado da engrenagem: "ok_7", ou o motivo da recusa. */
     etapa_alterada?: string;
     etapa_recusados?: string;
+    /** Resultado do reprocessar: "ok_<olhados>_<atualizados>_<moveram>_<falhas>". */
+    reprocessado?: string;
     reprocesso?: string;
     aba?: string;
     conta?: string;
@@ -81,6 +83,7 @@ export default async function PaginaExpedicao({
     falha,
     etapa_alterada: etapaAlterada,
     etapa_recusados: etapaRecusados,
+    reprocessado,
     impressao,
     liberacao,
     impressao_etiqueta: impressaoEtiqueta,
@@ -251,6 +254,7 @@ export default async function PaginaExpedicao({
           <>
             <Explicacao vista={vista} />
             {feito && <Feito feito={feito} quantos={quantos} recusados={recusados} />}
+            {reprocessado && <Reprocessado resultado={reprocessado} />}
             {etapaAlterada && (
               <EtapaAlterada
                 resultado={etapaAlterada}
@@ -556,6 +560,60 @@ function EtapaAlterada({
   return (
     <span className="rounded-md border border-critico-linha bg-critico-bg px-[9px] py-[3px] font-semibold text-critico">
       {texto[resultado] ?? "Não foi possível alterar a etapa."}
+    </span>
+  );
+}
+
+/**
+ * O que o reprocessamento respondeu.
+ *
+ * Os quatro números vão juntos porque juntos respondem sozinhos: "olhei 12, 3
+ * mudaram de estado, 1 saiu da esteira, 0 falharam" diz se valeu a pena E se
+ * algo deu errado. Um "pronto" solto mandaria a pessoa conferir linha por
+ * linha para descobrir o que mudou.
+ */
+function Reprocessado({ resultado }: { resultado: string }) {
+  if (resultado.startsWith("ok_")) {
+    const [olhados, atualizados, moveram, falhas] = resultado
+      .replace("_limite", "")
+      .slice(3)
+      .split("_")
+      .map((n) => Number(n) || 0);
+
+    const partes = [
+      `${olhados} ${olhados === 1 ? "caixa perguntada" : "caixas perguntadas"} ao Mercado Livre`,
+    ];
+    if (atualizados > 0) partes.push(`${atualizados} mudou de estado`);
+    if (moveram > 0) partes.push(`${moveram} saiu da esteira`);
+    if (falhas > 0) partes.push(`${falhas} não respondeu`);
+
+    return (
+      <span
+        className={`rounded-md border px-[9px] py-[3px] font-semibold ${
+          falhas > 0
+            ? "border-atencao-linha bg-atencao-bg text-atencao"
+            : "border-ok-linha bg-ok-bg text-ok"
+        }`}
+      >
+        {partes.join(" · ")}
+        {atualizados > 0 &&
+          ". A etiqueta que estiver liberada desce no próximo ciclo."}
+        {resultado.endsWith("_limite") &&
+          " Parei no limite do Mercado Livre — reprocesse o resto daqui a pouco."}
+      </span>
+    );
+  }
+
+  const texto: Record<string, string> = {
+    sem_permissao: "Você não pode reprocessar pedidos.",
+    nada_selecionado: "Marque pelo menos uma caixa antes.",
+    demais_de_uma_vez:
+      "São muitas de uma vez — o Mercado Livre bloqueia. Marque até 60.",
+  };
+
+  return (
+    <span className="rounded-md border border-critico-linha bg-critico-bg px-[9px] py-[3px] font-semibold text-critico">
+      {texto[resultado] ?? "Não foi possível reprocessar."}
     </span>
   );
 }
