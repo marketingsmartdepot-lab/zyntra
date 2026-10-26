@@ -34,7 +34,6 @@ type LinhaConta = {
   empresa_emissora_id: string | null;
   empresas: {
     razao_social: string;
-    serie_nfe: string | null;
     faturador_situacao: string;
   } | null;
   pools_estoque: { nome: string } | null;
@@ -56,7 +55,7 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
        emissao_pausada_em, emissao_pausa_motivo, ultimo_erro,
        canais ( nome, entra_na_esteira ),
        empresa_emissora_id,
-       empresas:empresa_emissora_id ( razao_social, serie_nfe, faturador_situacao ),
+       empresas:empresa_emissora_id ( razao_social, faturador_situacao ),
        pools_estoque:pool_estoque_id ( nome )`,
     )
     .order("apelido");
@@ -67,7 +66,7 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
   // a uma empresa desativada seria cadastrar um problema para daqui a um mês.
   const { data: emp } = await supabase
     .from("empresas")
-    .select("id, nome_curto, razao_social, serie_nfe, faturador_situacao")
+    .select("id, nome_curto, razao_social, faturador_situacao")
     .eq("ativa", true)
     .order("nome_curto");
 
@@ -112,7 +111,6 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
               "Faturador",
               "Emissão automática",
               "Baixa no Bling",
-              "Série",
               "Esteira",
               "Situação",
             ].map((c) => (
@@ -189,11 +187,6 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
                   ) : (
                     <ChaveDaBaixa conta={c} podeMexer={podeMexer} />
                   )}
-                </Celula>
-                <Celula>
-                  <span className="font-mono">
-                    {c.empresas?.serie_nfe ?? "—"}
-                  </span>
                 </Celula>
                 <Celula>
                   {c.entra_na_esteira ? (
@@ -525,7 +518,6 @@ type Emissora = {
   id: string;
   nome_curto: string;
   razao_social: string;
-  serie_nfe: string | null;
   faturador_situacao: string;
 };
 
@@ -576,7 +568,6 @@ function Emissora({
         {empresas.map((e) => (
           <option key={e.id} value={e.id}>
             {e.nome_curto}
-            {e.serie_nfe ? ` · série ${e.serie_nfe}` : " · sem série"}
             {e.faturador_situacao === "ativo" ? "" : " · faturador inativo"}
           </option>
         ))}

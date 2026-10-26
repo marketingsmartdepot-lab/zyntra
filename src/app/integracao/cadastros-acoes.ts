@@ -22,8 +22,6 @@ export async function criarEmpresa(formData: FormData) {
   const { error } = await supabase.from("empresas").insert({
     razao_social: razao,
     nome_curto: curto,
-    cnpj: String(formData.get("cnpj") ?? "").replace(/\D/g, "") || null,
-    serie_nfe: String(formData.get("serie_nfe") ?? "").trim() || null,
     faturador_situacao: String(formData.get("faturador") ?? "nao_configurado"),
   });
 
@@ -40,7 +38,6 @@ export async function atualizarFaturador(formData: FormData) {
     .from("empresas")
     .update({
       faturador_situacao: String(formData.get("faturador") ?? "nao_configurado"),
-      serie_nfe: String(formData.get("serie_nfe") ?? "").trim() || null,
     })
     .eq("id", id);
 

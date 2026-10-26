@@ -12,8 +12,6 @@ type Empresa = {
   id: string;
   razao_social: string;
   nome_curto: string;
-  cnpj: string | null;
-  serie_nfe: string | null;
   faturador_situacao: string;
 };
 
@@ -70,7 +68,7 @@ export async function Cadastros({ falha }: { falha?: string }) {
     await Promise.all([
       supabase
         .from("empresas")
-        .select("id, razao_social, nome_curto, cnpj, serie_nfe, faturador_situacao")
+        .select("id, razao_social, nome_curto, faturador_situacao")
         .order("nome_curto"),
       supabase
         .from("canais")
@@ -100,10 +98,10 @@ export async function Cadastros({ falha }: { falha?: string }) {
 
       <Secao
         titulo="Empresas emissoras"
-        explicacao="Quem emite a nota. Uma conta sem empresa emissora não fatura — o pedido para em Aberto dizendo faturador não configurado."
+        explicacao="Quem emite a nota. O ZYNTRA não fatura: quem fatura é o Faturador do Mercado Livre, com os dados fiscais configurados lá. Aqui fica o nome que aparece na esteira e a chave que libera o pedido de nota — conta sem empresa emissora não fatura, e o pedido para em Aberto."
       >
         {listaEmpresas.length > 0 && (
-          <Tabela cabecalhos={["Empresa", "CNPJ", "Série", "Faturador", ""]}>
+          <Tabela cabecalhos={["Empresa", "Faturador do ML", ""]}>
             {listaEmpresas.map((e) => (
               <tr key={e.id}>
                 <Celula>
@@ -112,8 +110,6 @@ export async function Cadastros({ falha }: { falha?: string }) {
                     {e.razao_social}
                   </span>
                 </Celula>
-                <Celula mono>{e.cnpj ?? "—"}</Celula>
-                <Celula mono>{e.serie_nfe ?? "—"}</Celula>
                 <Celula>
                   {FATURADOR.find((f) => f.valor === e.faturador_situacao)
                     ?.rotulo ?? e.faturador_situacao}
@@ -137,13 +133,6 @@ export async function Cadastros({ falha }: { falha?: string }) {
                           </option>
                         ))}
                       </select>
-                      <input
-                        name="serie_nfe"
-                        defaultValue={e.serie_nfe ?? ""}
-                        placeholder="série"
-                        aria-label={`Série da NF-e de ${e.nome_curto}`}
-                        className="w-[68px] rounded-lg border border-linha bg-superficie px-[9px] py-[6px] font-mono text-[12px]"
-                      />
                       <Botao>Salvar</Botao>
                     </form>
                   )}
@@ -157,8 +146,6 @@ export async function Cadastros({ falha }: { falha?: string }) {
           <form action={criarEmpresa} className="flex flex-wrap items-end gap-2">
             <Campo nome="razao_social" rotulo="Razão social" largura="240px" obrigatorio />
             <Campo nome="nome_curto" rotulo="Nome curto" largura="130px" obrigatorio />
-            <Campo nome="cnpj" rotulo="CNPJ" largura="150px" mono />
-            <Campo nome="serie_nfe" rotulo="Série" largura="70px" mono />
             <Botao principal>Cadastrar empresa</Botao>
           </form>
         )}
