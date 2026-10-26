@@ -5,6 +5,8 @@ import {
   alternarEmissao,
   definirEmpresaEmissora,
   retomarEmissao,
+  definirImportarDesde,
+  pausarImportacao,
 } from "./contas-acoes";
 import { conectarConta } from "./ml-acoes";
 import { Botao } from "@/components/botao";
@@ -24,6 +26,9 @@ type LinhaConta = {
   ref_externa: string | null;
   situacao: string;
   entra_na_esteira: boolean;
+  importar_desde: string | null;
+  importacao_pausada_em: string | null;
+  importacao_pausa_motivo: string | null;
   emissao_automatica: boolean;
   baixa_estoque_automatica: boolean;
   emissao_pausada_em: string | null;
@@ -51,6 +56,7 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
     .from("contas")
     .select(
       `id, apelido, ref_externa, situacao, entra_na_esteira,
+       importar_desde, importacao_pausada_em, importacao_pausa_motivo,
        emissao_automatica, baixa_estoque_automatica,
        emissao_pausada_em, emissao_pausa_motivo, ultimo_erro,
        canais ( nome, entra_na_esteira ),
@@ -112,6 +118,7 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
               "Emissão automática",
               "Baixa no Bling",
               "Esteira",
+              "Entrada de pedidos",
               "Situação",
             ].map((c) => (
               <th
@@ -195,6 +202,11 @@ export async function Contas({ falha, ml }: { falha?: string; ml?: string }) {
                     <Selo tom="neutro">Não</Selo>
                   )}
                 </Celula>
+
+                <Celula>
+                  <EntradaDePedidos conta={c} podeMexer={podeMexer} />
+                </Celula>
+
                 <Celula>
                   {fora ? (
                     <span className="text-[11.5px] text-suave">
@@ -377,14 +389,23 @@ function Resultado({ resultado }: { resultado: string }) {
     "emissao_retomada",
     "emissora_definida",
     "emissora_removida",
+    "corte_salvo",
+    "entrada_pausada",
+    "entrada_religada",
   ];
   const texto: Record<string, string> = {
     baixa_ligada:
       "Baixa no Bling ligada nesta conta. Vale para as vendas que chegarem agora — as que já entraram a Lexos baixou. Confirme que a Lexos parou de mandar os pedidos DESTA conta.",
     baixa_desligada:
       "Baixa no Bling desligada nesta conta. O que estava na fila dela também para.",
+    corte_salvo:
+      "Data de corte salva. Pedido criado antes dela não entra — e os que já entraram continuam onde estão.",
+    entrada_pausada:
+      "Esta conta parou de trazer pedidos. Ela segue conectada: nada precisa ser refeito para religar.",
+    entrada_religada:
+      "Voltou a trazer pedidos. Os que foram criados durante a pausa entram nas próximas varreduras.",
     emissora_definida:
-      "Emissora definida. É ela que decide o CNPJ e a série da nota desta conta.",
+      "Emissora definida. É ela que decide por qual empresa esta conta fatura.",
     emissora_removida:
       "Emissora removida. Sem emissora esta conta não fatura — os pedidos param em Aberto.",
     emissao_ligada:
@@ -579,5 +600,121 @@ function Emissora({
         Salvar emissora
       </button>
     </form>
+  );
+}
+
+
+/**
+ * Quando os pedidos desta conta começam a cair, e como parar.
+ *
+ * Duas datas com papéis diferentes, e a distinção importa:
+ *
+ *   `importar_desde` é o CHÃO, escolhido por gente. Nunca entra pedido criado
+ *   antes dele. Ao conectar, vira a hora da conexão — conta nova não traz
+ *   histórico, que foi o medo da Daniele ao ligar a SMARTDEPOT.
+ *
+ *   `varrido_ate` é a marca d'água da máquina e não aparece aqui de
+ *   propósito: é detalhe de funcionamento, e mostrar duas datas parecidas na
+ *   mesma célula faria alguém editar a errada.
+ *
+ * Pausar não desconecta: o token continua valendo e nada precisa ser refeito
+ * depois. E ao voltar, a marca d'água recua até o momento da pausa, então os
+ * pedidos do período entram — sem isso, pausar seria perder venda em silêncio.
+ */
+function EntradaDePedidos({
+  conta,
+  podeMexer,
+}: {
+  conta: LinhaConta;
+  podeMexer: boolean;
+}) {
+  const pausada = Boolean(conta.importacao_pausada_em);
+
+  const dia = (iso: string | null) =>
+    iso
+      ? new Date(iso).toLocaleString("pt-BR", {
+          dateStyle: "short",
+          timeStyle: "short",
+          timeZone: "America/Sao_Paulo",
+        })
+      : null;
+
+  return (
+    <div className="flex min-w-[220px] flex-col gap-[6px]">
+      {pausada ? (
+        <>
+          <Selo tom="critico">Pausada</Selo>
+          <span className="text-[11px] leading-snug text-suave">
+            desde {dia(conta.importacao_pausada_em)}
+            {conta.importacao_pausa_motivo && ` · ${conta.importacao_pausa_motivo}`}
+          </span>
+          {podeMexer && (
+            <form action={pausarImportacao.bind(null, false)}>
+              <input type="hidden" name="conta" value={conta.id} />
+              <Botao
+                trabalhando="Religando…"
+                className="rounded-lg border border-linha px-[10px] py-[5px] text-[12px] font-semibold"
+              >
+                Voltar a trazer pedidos
+              </Botao>
+            </form>
+          )}
+        </>
+      ) : (
+        <>
+          <span className="text-[11.5px] text-suave">
+            {conta.importar_desde
+              ? `desde ${dia(conta.importar_desde)}`
+              : "desde sempre"}
+          </span>
+
+          {podeMexer && (
+            <>
+              <form
+                action={definirImportarDesde}
+                className="flex items-center gap-[5px]"
+              >
+                <input type="hidden" name="conta" value={conta.id} />
+                <label htmlFor={`desde-${conta.id}`} className="sr-only">
+                  A partir de quando trazer pedidos de {conta.apelido}
+                </label>
+                <input
+                  id={`desde-${conta.id}`}
+                  type="date"
+                  name="desde"
+                  defaultValue={conta.importar_desde?.slice(0, 10) ?? ""}
+                  className="rounded-lg border border-linha bg-superficie px-2 py-[5px] text-[12px]"
+                />
+                <Botao
+                  trabalhando="…"
+                  className="rounded-lg border border-linha px-[9px] py-[5px] text-[12px] font-semibold"
+                >
+                  OK
+                </Botao>
+              </form>
+
+              <form
+                action={pausarImportacao.bind(null, true)}
+                className="flex items-center gap-[5px]"
+              >
+                <input type="hidden" name="conta" value={conta.id} />
+                <input
+                  name="motivo"
+                  placeholder="motivo da pausa"
+                  aria-label={`Motivo para pausar os pedidos de ${conta.apelido}`}
+                  className="w-[130px] rounded-lg border border-linha bg-superficie px-2 py-[5px] text-[12px]"
+                />
+                <Botao
+                  trabalhando="Pausando…"
+                  className="rounded-lg border border-critico-linha px-[9px] py-[5px] text-[12px] font-semibold text-critico"
+                >
+                  Pausar
+                </Botao>
+              </form>
+            </>
+          )}
+        </>
+      )}
+    </div>
   );
 }

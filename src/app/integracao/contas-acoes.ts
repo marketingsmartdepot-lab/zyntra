@@ -138,3 +138,76 @@ export async function retomarEmissao(formData: FormData) {
     }`,
   );
 }
+
+/**
+ * A partir de quando esta conta traz pedidos.
+ *
+ * O chão, escolhido por gente: nunca entra pedido criado antes desta data. Ao
+ * conectar uma conta ela recebe a hora da conexão, que é o que faz conta nova
+ * não despejar meses de histórico na esteira.
+ *
+ * Só a data, sem hora: quem decide isso pensa em dias ("a partir de hoje", "a
+ * partir de segunda"), e pedir hora seria precisão falsa.
+ */
+export async function definirImportarDesde(formData: FormData) {
+  const conta = String(formData.get("conta") ?? "");
+  const desde = String(formData.get("desde") ?? "").trim();
+  if (!conta) return;
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase
+    .from("contas")
+    // Campo vazio = sem chão: volta a valer só o teto de 7 dias da varredura.
+    .update({ importar_desde: desde ? `${desde}T00:00:00-03:00` : null })
+    .eq("id", conta);
+
+  revalidatePath("/integracao");
+  redirect(
+    `/integracao?aba=contas&falha=${
+      error
+        ? error.message.includes("row-level security")
+          ? "sem_permissao"
+          : "erro"
+        : "corte_salvo"
+    }`,
+  );
+}
+
+/**
+ * Para e volta a trazer pedidos de uma conta, sem desconectar.
+ *
+ * Desconectar resolveria, mas perde o token e obriga a refazer o OAuth no
+ * Mercado Livre depois — caro demais para uma pausa de alguns dias.
+ *
+ * `pausar` vem amarrado na ação e não num campo do formulário: o name/value de
+ * um botão de envio não chega de forma confiável numa Server Action, e o
+ * sintoma é o pior possível — a ação roda, não recebe nada, e volta calada.
+ * Mesmo erro que já me pegou na escolha da bancada e no "mandar pro coletor".
+ */
+export async function pausarImportacao(pausar: boolean, formData: FormData) {
+  const conta = String(formData.get("conta") ?? "");
+  const motivo = String(formData.get("motivo") ?? "").trim();
+  if (!conta) return;
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.rpc("pausar_importacao", {
+    p_conta_id: conta,
+    p_pausar: pausar,
+    p_motivo: motivo || null,
+  });
+
+  const r = Array.isArray(data) ? data[0] : data;
+
+  revalidatePath("/integracao");
+  redirect(
+    `/integracao?aba=contas&falha=${
+      error
+        ? "erro"
+        : r?.ok
+          ? pausar
+            ? "entrada_pausada"
+            : "entrada_religada"
+          : (r?.motivo ?? "erro")
+    }`,
+  );
+}
