@@ -95,20 +95,17 @@ export default async function TelaDaSeparacao({
     );
   }
 
+  // Por FUNÇÃO, e não pelas tabelas: quem entra por PIN usa a conta do
+  // aparelho, que não é da equipe e por isso não lê `pedidos`, `pacotes` nem
+  // `skus` — e `separacao_progresso` atravessa as três para montar o
+  // esperado. Abrir aquilo para um celular de corredor custaria caro demais
+  // por uma lista de cinco linhas; a função devolve só o que a tela desenha.
   const [{ data: lista }, { data: itens }] = await Promise.all([
-    supabase
-      .from("listas_separacao")
-      .select("id, codigo, situacao, modo")
-      .eq("id", id)
-      .maybeSingle(),
-    supabase
-      .from("separacao_progresso")
-      .select("*")
-      .eq("lista_id", id)
-      .order("codigo"),
+    supabase.rpc("lista_da_separacao", { p_lista_id: id }),
+    supabase.rpc("pecas_da_separacao", { p_lista_id: id }),
   ]);
 
-  const l = lista as Lista | null;
+  const l = ((Array.isArray(lista) ? lista[0] : lista) ?? null) as Lista | null;
   const linhas = (itens ?? []) as Item[];
 
   // Nao achou, ou achou e a lista foi para o PAPEL: nos dois casos a pessoa
