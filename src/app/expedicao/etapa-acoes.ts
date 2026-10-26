@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { estacaoDaMaquina } from "@/lib/estacao";
 
 /**
  * Move à mão os pacotes marcados para outra etapa.
@@ -40,6 +41,30 @@ export async function alterarEtapaDosMarcados(formData: FormData) {
 
   const r = Array.isArray(data) ? data[0] : data;
   if (!r?.ok) return voltar(r?.motivo ?? "erro");
+
+  // Mover para Conferir é, na cabeça de quem faz, "quero conferir de novo".
+  // Mas a conferência antiga está fechada e mover a etapa não a reabre — a
+  // aba mostraria "Abrir a bancada" em vez do campo de bipe, e quem esperava
+  // bipar acha que não funcionou. Então reabrimos junto.
+  //
+  // Aqui e não no banco porque é AQUI que se sabe de qual bancada a máquina
+  // é: mora num cookie. Reabrir no banco gravaria a conferência sem bancada,
+  // e essa é justamente a coluna que responde "onde a caixa foi conferida".
+  if (etapa === "conferir") {
+    const estacao = await estacaoDaMaquina();
+    const mudados = (r.mudados ?? []) as string[];
+
+    for (const id of mudados) {
+      // Falha ao reabrir não desfaz a mudança de etapa: a caixa ESTÁ em
+      // Conferir, e isso já é verdade. O botão "Abrir a bancada" continua na
+      // tela para quem precisar, agora dizendo o motivo quando recusa.
+      await supabase.rpc("abrir_conferencia", {
+        p_pacote_id: id,
+        p_estacao_id: estacao,
+        p_sessao_id: null,
+      });
+    }
+  }
 
   revalidatePath("/expedicao");
 

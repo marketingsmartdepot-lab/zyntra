@@ -2,7 +2,7 @@ import Link from "next/link";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { Etapa } from "@/lib/supabase/tipos";
 import { Bancada, type ItemConferido } from "./bancada";
-import { iniciarConferencia } from "./acoes";
+import { AbrirBancada } from "./abrir-bancada";
 import type { DivergenciaAberta, Lider } from "./divergencia";
 import { BlocoDoPedido } from "./itens";
 import { FilaDePacotes, type PacoteNaFila } from "./fila";
@@ -288,7 +288,7 @@ async function Detalhe({
                 modoBipagem={await modoBipagemLigado()}
               />
             ) : (
-              <IniciarBancada pacoteId={pacote.id} />
+              <AbrirBancada pacoteId={pacote.id} />
             )
           ) : (
             <BiparAindaNao etapa={etapa} />
@@ -398,30 +398,6 @@ function Historico({ eventos }: { eventos: Evento[] }) {
   );
 }
 
-function IniciarBancada({ pacoteId }: { pacoteId: string }) {
-  async function abrir() {
-    "use server";
-    await iniciarConferencia(pacoteId);
-  }
-
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-      <p className="max-w-[48ch] text-[14px] leading-relaxed text-suave">
-        Abrir a conferência congela o que tem que estar na caixa, já expandindo
-        kit. O catálogo pode mudar no meio do turno, mas a caixa que o operador
-        tem na mão é a de agora.
-      </p>
-      <form action={abrir}>
-        <button
-          type="submit"
-          className="rounded-[10px] bg-tinta px-[22px] py-[13px] text-[15px] font-semibold text-white"
-        >
-          Abrir a bancada
-        </button>
-      </form>
-    </div>
-  );
-}
 
 function rotuloEtapa(e: string) {
   const mapa: Record<string, string> = {
