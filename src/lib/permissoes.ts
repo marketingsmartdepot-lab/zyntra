@@ -21,8 +21,33 @@ export const FRENTE_PERMISSAO: Record<string, string> = Object.fromEntries(
 export async function permissoesDeAgora(): Promise<Set<string>> {
   const supabase = await criarClienteServidor();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return new Set();
+
+  // O `where` é EXPLÍCITO, e isso não é redundância com a RLS.
+  //
+  // Esta consulta já foi `select(...).maybeSingle()` sem filtro, confiando na
+  // política para devolver exatamente uma linha. Funcionou enquanto só havia
+  // um perfil no sistema: para um administrador, que enxerga todos, "todos" e
+  // "o meu" eram a mesma linha.
+  //
+  // No dia em que nasceu o segundo perfil, `maybeSingle()` passou a receber
+  // duas linhas — e com duas linhas ele não devolve a primeira, devolve erro.
+  // O perfil veio nulo, o conjunto de permissões veio vazio, e a tela disse
+  // "Nenhuma frente está liberada" para a dona do sistema. Em 26/10 isso
+  // aconteceu de verdade, e quem inseriu a segunda linha fui eu.
+  //
+  // Política é guarda, não é cláusula de busca. Quando as duas coisas se
+  // confundem, o sistema fica certo por coincidência.
   const [{ data: perfil }, { data: possiveis }] = await Promise.all([
-    supabase.from("perfis").select("papel, permissoes").maybeSingle(),
+    supabase
+      .from("perfis")
+      .select("papel, permissoes")
+      .eq("id", user.id)
+      .maybeSingle(),
     supabase.rpc("permissoes_possiveis"),
   ]);
 
@@ -44,5 +69,12 @@ export async function permissoesDeAgora(): Promise<Set<string>> {
  */
 export async function primeiraFrenteAberta(): Promise<string | null> {
   const pode = await permissoesDeAgora();
-  return FRENTES.find((f) => pode.has(f.permissao))?.href ?? null;
+  const frente = FRENTES.find((f) => pode.has(f.permissao))?.href;
+  if (frente) return frente;
+
+  // A separação no coletor não é uma frente do menu — de propósito: quem
+  // entra por PIN no celular não navega, ele separa. Mas a raiz precisa saber
+  // para onde mandar essa pessoa, senão ela entra e bate numa porta trancada
+  // logo depois de digitar o PIN certo.
+  return pode.has("separar_no_coletor") ? "/separacao" : null;
 }

@@ -73,7 +73,12 @@ export default async function TelaDaSeparacao({
   if (!user) redirect(`/entrar?destino=/separacao/${id}`);
 
   const pode = await permissoesDeAgora();
-  if (!pode.has("ver_expedicao")) redirect("/");
+  // `separar_no_coletor` é a permissão da conta do aparelho, e abre só isto.
+  // `ver_expedicao` continua valendo para quem entra pela conta da equipe e
+  // abre a lista do computador — os dois caminhos chegam na mesma tela.
+  if (!pode.has("separar_no_coletor") && !pode.has("ver_expedicao")) {
+    redirect("/");
+  }
 
   // Quem está com o coletor. O aparelho fica logado com a conta da equipe; o
   // PIN diz quem está no corredor agora. `eu` cobre o desenho logo após a

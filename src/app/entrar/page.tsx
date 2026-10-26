@@ -1,14 +1,21 @@
 import { Assinatura, Logotipo, Rodape, SimboloZ } from "@/components/marca";
 import { FormularioEntrada } from "./formulario";
+import { criarClienteServidor } from "@/lib/supabase/server";
 
 export const metadata = { title: "Entrar — ZYNTRA" };
 
 export default async function PaginaEntrar({
   searchParams,
 }: {
-  searchParams: Promise<{ destino?: string }>;
+  searchParams: Promise<{ destino?: string; porta?: string }>;
 }) {
-  const { destino } = await searchParams;
+  const { destino, porta } = await searchParams;
+
+  // Quem entra por PIN precisa achar o próprio nome. A lista vem do banco com
+  // só id e nome, e só de quem tem PIN — a tela de entrada é pública, então
+  // leva o mínimo.
+  const supabase = await criarClienteServidor();
+  const { data: operadores } = await supabase.rpc("operadores_da_porta");
   const paraOnde =
     destino && destino.startsWith("/") && !destino.startsWith("//")
       ? destino
@@ -39,7 +46,11 @@ export default async function PaginaEntrar({
             <Assinatura className="mt-[26px]" />
           </div>
 
-          <FormularioEntrada destino={paraOnde} />
+          <FormularioEntrada
+            destino={paraOnde}
+            operadores={(operadores ?? []) as { id: string; nome: string }[]}
+            porta={porta}
+          />
         </div>
       </div>
 
