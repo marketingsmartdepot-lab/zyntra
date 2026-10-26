@@ -166,7 +166,14 @@ export async function BlocoDoPedido({
         descricao: sku?.descricao ?? i.titulo ?? "Produto sem descrição",
         quantidade: i.quantidade,
         preco_unitario: i.preco_unitario,
-        foto: i.foto_url ?? sku?.foto_url ?? null,
+        // SÓ a foto do anúncio, sem cair para a do catálogo. Decisão da
+        // Daniele, e a razão aparece justamente quando a reserva seria usada:
+        // a foto do catálogo serve a linha de produto inteira e pode ser de
+        // outra cor, outro tamanho, outra versão. Quem está com a caixa na
+        // mão não vai desconfiar de uma foto — vai conferir contra ela. Foto
+        // errada não é informação ruim, é instrução errada dada com
+        // confiança. Sem foto, confere-se pelo código e pelo EAN.
+        foto: i.foto_url ?? null,
         mapeado: Boolean(sku),
       });
     }
