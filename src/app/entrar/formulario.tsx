@@ -1,36 +1,59 @@
 "use client";
 
 import { useState } from "react";
-
 import { useRouter } from "next/navigation";
 import { criarClienteNavegador } from "@/lib/supabase/client";
 
-/**
- * A porta de entrada, e só ela: e-mail e senha.
- *
- * Havia uma segunda aba, "Estação do galpão", com um teclado de PIN desenhado
- * e DESLIGADO. Ela não consultava nada: mostrava "Nenhuma estação cadastrada"
- * para sempre, mesmo com estações cadastradas, e prometia que o PIN
- * "começaria a valer" quando elas existissem.
- *
- * A promessa era falsa em dois níveis. A tela nunca olhava as estações — e,
- * mais fundo, o PIN nunca foi para entrar no sistema. O aparelho entra com uma
- * conta da equipe e fica logado; o PIN, em cima disso, diz QUEM está com ele
- * na mão agora — é o que faz a separação sair assinada e o bipe da porta ter
- * dono. São perguntas diferentes, e essa aba misturava as duas.
- *
- * A Daniele perdeu tempo nela tentando abrir a lista de separação no celular.
- * Tela que ensina coisa errada na porta de entrada custa mais que tela que
- * falta.
- */
+type Aba = "equipe" | "estacao";
+
 export function FormularioEntrada({ destino }: { destino: string }) {
+  const [aba, setAba] = useState<Aba>("equipe");
+
   return (
     <div className="w-[404px] rounded-2xl border border-grafite-linha bg-grafite-2 p-7">
-      <Equipe destino={destino} />
+      <div
+        role="tablist"
+        aria-label="Forma de entrar"
+        className="mb-[22px] flex gap-1 rounded-xl border border-grafite-linha bg-grafite-3 p-[3px]"
+      >
+        <BotaoAba ativa={aba === "equipe"} onClick={() => setAba("equipe")}>
+          Equipe
+        </BotaoAba>
+        <BotaoAba ativa={aba === "estacao"} onClick={() => setAba("estacao")}>
+          Estação do galpão
+        </BotaoAba>
+      </div>
+
+      {aba === "equipe" ? <Equipe destino={destino} /> : <Estacao />}
     </div>
   );
 }
 
+function BotaoAba({
+  ativa,
+  onClick,
+  children,
+}: {
+  ativa: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={ativa}
+      onClick={onClick}
+      className={`flex-1 whitespace-nowrap rounded-lg px-2 py-[9px] text-[12.5px] font-semibold transition-colors ${
+        ativa
+          ? "bg-champanhe text-grafite"
+          : "text-cinza-2 hover:text-offwhite"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 function Equipe({ destino }: { destino: string }) {
   const router = useRouter();
@@ -120,6 +143,54 @@ function Equipe({ destino }: { destino: string }) {
   );
 }
 
+function Estacao() {
+  return (
+    <div>
+      <div className="mb-4 rounded-[10px] border border-grafite-linha bg-grafite-3 p-4">
+        <p className="text-[14px] font-semibold text-offwhite">
+          Nenhuma estação cadastrada
+        </p>
+        <p className="mt-1 text-[12px] leading-relaxed text-cinza-2">
+          A entrada por PIN começa a valer quando as estações da bancada
+          existirem no sistema. Até lá, use a conta da equipe.
+        </p>
+      </div>
+
+      <div
+        aria-hidden="true"
+        className="pointer-events-none select-none opacity-40"
+      >
+        <span className="mb-[9px] block text-[10.5px] font-semibold uppercase tracking-[0.14em] text-cinza-2">
+          PIN
+        </span>
+        <div className="mb-[18px] flex justify-center gap-3">
+          {[0, 1, 2, 3].map((i) => (
+            <span
+              key={i}
+              className="block h-[13px] w-[13px] rounded-full border-[1.5px] border-grafite-linha-2"
+            />
+          ))}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "Limpar", "0", "Entrar"].map(
+            (t) => (
+              <span
+                key={t}
+                className={`rounded-[10px] border border-grafite-linha bg-grafite-3 py-[13px] text-center ${
+                  t.length > 1
+                    ? "text-[12.5px] font-semibold text-cinza-2"
+                    : "font-mono text-[19px] font-semibold text-offwhite"
+                }`}
+              >
+                {t}
+              </span>
+            ),
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const estiloCampo =
   "w-full rounded-[10px] border border-grafite-linha bg-grafite-3 px-[14px] py-3 text-[14.5px] text-offwhite outline-none focus-visible:border-champanhe";
