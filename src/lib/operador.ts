@@ -20,14 +20,20 @@ export async function noAparelho(): Promise<NoAparelho> {
   if (!id) return null;
 
   const supabase = await criarClienteServidor();
-  const { data } = await supabase
-    .from("operadores_para_identificar")
-    .select("id, nome")
-    .eq("id", id)
-    .maybeSingle();
+
+  // Por função, e não pela view: a view lê `operadores` com os direitos de
+  // quem pergunta, e a conta do aparelho não tem — nem pode ter. Aquela
+  // tabela guarda `pin_hash`, e política de RLS é por LINHA, não por coluna:
+  // liberar a leitura entregaria os hashes de todos os PINs à sessão de um
+  // celular. A função devolve só id e nome.
+  const { data } = await supabase.rpc("operador_da_porta", { p_id: id });
+  const achado = (Array.isArray(data) ? data[0] : data) as
+    | { id: string; nome: string }
+    | null
+    | undefined;
 
   // Sumiu da lista (desativado, PIN removido): o cookie deixa de valer.
-  return (data as { id: string; nome: string } | null) ?? null;
+  return achado ?? null;
 }
 
 export const COOKIE_OPERADOR = COOKIE;

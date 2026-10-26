@@ -19,15 +19,15 @@ export async function QuemEVoce({
   aviso?: string;
 }) {
   const supabase = await criarClienteServidor();
-  const { data } = await supabase
-    .from("operadores_para_identificar")
-    .select("id, nome, bloqueado")
-    .order("nome");
+  // Mesma razão de `noAparelho`: a lista vem de uma função que devolve só id
+  // e nome, e não da view, que exigiria leitura de `operadores` — a tabela
+  // que guarda os PINs. O celular nunca a alcança.
+  const { data } = await supabase.rpc("operadores_da_porta");
 
   const gente = (data ?? []) as {
     id: string;
     nome: string;
-    bloqueado: boolean;
+    bloqueado?: boolean;
   }[];
 
   const texto: Record<string, string> = {
