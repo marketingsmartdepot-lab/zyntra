@@ -247,25 +247,36 @@ export default async function TelaDaSeparacao({
                   : "border-linha bg-superficie"
             }`}
           >
+            {/*
+              A foto é grande de propósito. Quem separa está de pé num
+              corredor, com o celular na altura do peito e a prateleira na
+              frente — a 46px que isto tinha antes só servia para decorar a
+              linha. O que ela precisa fazer é uma coisa só: reconhecer a peça
+              de relance, sem ler o código.
+
+              É a foto do ANÚNCIO, a mesma que o cliente viu ao comprar.
+            */}
             <div className="flex items-start gap-3">
               {i.foto_url ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={i.foto_url}
                   alt=""
-                  width={46}
-                  height={46}
-                  className="h-[46px] w-[46px] shrink-0 rounded-[8px] border border-linha object-cover"
+                  width={96}
+                  height={96}
+                  className="h-[96px] w-[96px] shrink-0 rounded-[10px] border border-linha bg-fundo object-contain"
                 />
               ) : (
-                <span className="h-[46px] w-[46px] shrink-0 rounded-[8px] border border-linha" />
+                <span className="flex h-[96px] w-[96px] shrink-0 items-center justify-center rounded-[10px] border border-dashed border-linha text-center text-[10.5px] leading-tight text-suave">
+                  sem foto
+                </span>
               )}
 
               <span className="min-w-0 flex-1">
                 <span className="block font-mono text-[14px] font-bold">
                   {i.codigo}
                 </span>
-                <span className="block text-[13px] leading-snug">
+                <span className="mt-[2px] block text-[13.5px] leading-snug">
                   {i.descricao ?? "produto sem descrição"}
                 </span>
                 {i.codigo_barras && (
