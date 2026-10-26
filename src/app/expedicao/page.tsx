@@ -49,6 +49,9 @@ export default async function PaginaExpedicao({
     impressao?: string;
     liberacao?: string;
     impressao_etiqueta?: string;
+    /** Resultado da engrenagem: "ok_7", ou o motivo da recusa. */
+    etapa_alterada?: string;
+    etapa_recusados?: string;
     reprocesso?: string;
     aba?: string;
     conta?: string;
@@ -76,6 +79,8 @@ export default async function PaginaExpedicao({
     pacote,
     lista,
     falha,
+    etapa_alterada: etapaAlterada,
+    etapa_recusados: etapaRecusados,
     impressao,
     liberacao,
     impressao_etiqueta: impressaoEtiqueta,
@@ -246,6 +251,12 @@ export default async function PaginaExpedicao({
           <>
             <Explicacao vista={vista} />
             {feito && <Feito feito={feito} quantos={quantos} recusados={recusados} />}
+            {etapaAlterada && (
+              <EtapaAlterada
+                resultado={etapaAlterada}
+                recusados={etapaRecusados}
+              />
+            )}
             {falha && (
               <span className="rounded-md border border-critico-linha bg-critico-bg px-[9px] py-[3px] font-semibold text-critico">
                 {falha === "todos_ja_em_lista"
@@ -503,6 +514,48 @@ function Feito({
           {lista.map((r) => `${r.codigo} (${r.motivo})`).join(", ")} de fora
         </span>
       )}
+    </span>
+  );
+}
+
+/**
+ * O que a engrenagem respondeu.
+ *
+ * As recusas vêm por extenso e não como contagem: quem marcou vinte caixas
+ * precisa saber QUAIS ficaram para trás. "18 de 20" manda a pessoa conferir
+ * vinte linhas na mão.
+ */
+function EtapaAlterada({
+  resultado,
+  recusados,
+}: {
+  resultado: string;
+  recusados?: string;
+}) {
+  if (resultado.startsWith("ok_")) {
+    const n = Number(resultado.slice(3)) || 0;
+
+    return (
+      <span className="rounded-md border border-ok-linha bg-ok-bg px-[9px] py-[3px] font-semibold text-ok">
+        {n === 0
+          ? "Nenhuma caixa mudou de etapa."
+          : `${n} ${n === 1 ? "caixa mudou" : "caixas mudaram"} de etapa.`}
+        {recusados && ` Ficaram de fora — ${recusados}`}
+      </span>
+    );
+  }
+
+  const texto: Record<string, string> = {
+    sem_permissao: "Você não pode alterar a etapa na mão.",
+    motivo_curto: "Escreva um motivo — e um que explique, não “ok”.",
+    sem_destino: "Escolha para qual etapa.",
+    nada_selecionado: "Marque pelo menos uma caixa antes.",
+    etapa_desconhecida: "Essa etapa não existe.",
+  };
+
+  return (
+    <span className="rounded-md border border-critico-linha bg-critico-bg px-[9px] py-[3px] font-semibold text-critico">
+      {texto[resultado] ?? "Não foi possível alterar a etapa."}
     </span>
   );
 }

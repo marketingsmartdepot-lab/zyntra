@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Etapa, LinhaPacote } from "@/lib/supabase/tipos";
-import { ondeEstaNoCanal } from "@/lib/supabase/tipos";
+import { ondeEstaNoCanal, ABAS_EXPEDICAO } from "@/lib/supabase/tipos";
+import { alterarEtapaDosMarcados } from "./etapa-acoes";
 import { Botao } from "@/components/botao";
 import { gerarLista } from "./listas/acoes";
 import { tirarDoRetido } from "./retencao-acoes";
@@ -43,6 +44,9 @@ export function ListaPacotes({
   const podeListar = vista === "separar" && liberado("gerar_lista");
   const podeDevolver = vista === "retido" && liberado("reter_pedido");
   const podeDoca = vista === "pronto";
+  // A engrenagem aparece em toda aba: alterar etapa à mão serve justamente
+  // quando a caixa está onde não devia, e isso acontece em qualquer uma.
+  const podeAlterarEtapa = liberado("alterar_etapa");
   // A caixinha aparece em TODA aba, a pedido dela. Nas abas que ainda não têm
   // ação em massa ela não faz nada além de marcar — e é assim de propósito:
   // tirar a coluna de uma aba e pôr noutra faz o time procurar onde não tem.
@@ -262,6 +266,100 @@ export function ListaPacotes({
   return (
     <form className="flex flex-1 flex-col">
       <input type="hidden" name="vista" value={vista} />
+
+      {/*
+        A engrenagem fica DENTRO do formulário de propósito: fora dele ela não
+        enxergaria quais caixas estão marcadas, e o botão mandaria uma lista
+        vazia sem dizer por quê.
+      */}
+      {podeAlterarEtapa && (
+        <div className="flex items-center justify-end border-b border-linha bg-fundo px-5 py-[7px]">
+          <details className="relative">
+            <summary
+              className="flex cursor-pointer list-none items-center gap-[6px] rounded-lg border border-linha bg-superficie px-[10px] py-[6px] text-[12.5px] font-semibold text-suave hover:text-tinta"
+              aria-label="Ações em massa"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              Ações
+            </summary>
+
+            <div className="absolute right-0 z-20 mt-2 w-[380px] rounded-[10px] border border-linha bg-superficie p-4 shadow-[0_10px_30px_rgba(17,25,28,.16)]">
+              <h3 className="m-0 text-[13.5px] font-bold tracking-[-0.01em]">
+                Alterar status do pedido
+              </h3>
+              <p className="mb-3 mt-1 text-[12px] leading-relaxed text-suave">
+                Move as caixas marcadas para a etapa escolhida, furando o
+                caminho normal da esteira.
+              </p>
+
+              <label
+                htmlFor="etapa-destino"
+                className="mb-[5px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+              >
+                Para qual etapa
+              </label>
+              <select
+                id="etapa-destino"
+                name="etapa_destino"
+                defaultValue=""
+                className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[8px] text-[13px]"
+              >
+                <option value="" disabled>
+                  — escolha —
+                </option>
+                {ABAS_EXPEDICAO.map((a) => (
+                  <option key={a.etapa} value={a.etapa}>
+                    {a.rotulo}
+                  </option>
+                ))}
+                <option value="retido">Retidos</option>
+              </select>
+
+              <label
+                htmlFor="etapa-motivo"
+                className="mb-[5px] block text-[10.5px] font-semibold uppercase tracking-[0.13em] text-suave"
+              >
+                Motivo (obrigatório)
+              </label>
+              <input
+                id="etapa-motivo"
+                name="motivo_etapa"
+                required
+                minLength={5}
+                placeholder="ex.: cliente retirou no balcão"
+                className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[8px] text-[13px]"
+              />
+
+              <p className="mb-3 mt-0 rounded-lg border border-atencao-linha bg-atencao-bg px-3 py-2 text-[11.5px] leading-relaxed text-atencao">
+                Isto muda só a etapa. Mover para <b>Enviado</b> por aqui{" "}
+                <b>não cobra o custo de etiqueta</b> — ele só é contado no bipe
+                da porta. E não grava saída, não fecha conferência e não
+                imprime nada.
+              </p>
+
+              <Botao
+                formAction={alterarEtapaDosMarcados}
+                trabalhando="Alterando…"
+                className="w-full rounded-lg bg-tinta px-4 py-[9px] text-[13px] font-semibold text-white"
+              >
+                Alterar os marcados
+              </Botao>
+            </div>
+          </details>
+        </div>
+      )}
+
       {tabela}
 
       <div className="mt-auto flex flex-wrap items-center gap-3 border-t border-linha bg-fundo px-5 py-3">
