@@ -226,12 +226,49 @@ Deno.serve(async (req) => {
   }
 
   if (resposta.ok) {
+    // 2xx do ML quer dizer "nota CRIADA", não "nota autorizada". Nesse momento
+    // ela ainda vai ao SEFAZ: `status` vem `pending_authorization`, e número,
+    // série e chave de acesso nem existem — só nascem na autorização.
+    //
+    // Tratar 2xx como autorizada custava duas coisas, as duas medidas no
+    // pedido 2000019218896500 em 03/11/2026:
+    //
+    //   1. `reavaliar_pacote` mandava o pedido para Faturado em cima de uma
+    //      nota que o SEFAZ ainda podia rejeitar. Numa rejeição, a etiqueta
+    //      seria buscada e a caixa sairia do galpão sem NF-e válida. Naquele
+    //      pedido o SEFAZ autorizou 65 segundos depois — deu certo por sorte.
+    //   2. série, número e chave ficavam vazios para sempre. Quem preencheria
+    //      é `varrer_notas_ml`, mas ela só procura pedido em Aberto SEM nota
+    //      autorizada: com a nota marcada autorizada e o pacote em Faturado,
+    //      ela nunca voltava nele.
+    //
+    // Então só `authorized` vale como autorizada. Qualquer outro status deixa
+    // a nota em `solicitada` e o pacote em Aberto, e quem conclui é
+    // `varrer_notas_ml`: ela lê GET /users/{uid}/invoices/orders/{oid} a cada
+    // cinco minutos, já traduz o status e já extrai série, número e chave.
+    // A chave de idempotência das duas pontas é a mesma
+    // (`ml:<conta>:<pedido>`), então ela faz UPDATE na linha que nasceu aqui,
+    // nunca uma segunda nota.
+    //
+    // Não reenviar não é risco: o guarda de `ja_existe` acima impede que o
+    // cron peça de novo uma nota já `solicitada`, e
+    // `marcar_notas_sem_resposta` dá rosto a ela se demorar demais.
+    const statusML = (texto(json, ["status"]) ?? "").toLowerCase();
+
+    if (statusML !== "authorized" && statusML !== "authorised") {
+      return responder(200, {
+        ok: true,
+        motivo: "aguardando_sefaz",
+        status_ml: statusML || null,
+      });
+    }
+
     await servico.rpc("registrar_resposta_nota", {
       p_nota_id: s.nota_id,
       p_autorizada: true,
       p_ref_externa: texto(json, ["id", "invoice_id"]),
-      p_serie: texto(json, ["series", "serie"]),
-      p_numero: numero(json, ["number", "numero"]),
+      p_serie: texto(json, ["invoice_series", "series", "serie"]),
+      p_numero: numero(json, ["invoice_number", "number", "numero"]),
       p_chave_acesso: texto(json, ["access_key", "key", "chave_acesso"]),
       p_xml_url: texto(json, ["xml_url", "xml"]),
       p_danfe_url: texto(json, ["pdf_url", "danfe_url"]),
