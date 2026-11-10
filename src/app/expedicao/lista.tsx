@@ -227,8 +227,7 @@ export function ListaPacotes({
                       nota={nota}
                       situacao={envio?.situacao_canal ?? null}
                       substatus={envio?.substatus_canal ?? null}
-                      limite={envio?.limite_envio_em ?? null}
-                      limiteOrigem={envio?.limite_origem ?? null}
+                      liberaEm={envio?.libera_etiqueta_em ?? null}
                     />
                   </Celula>
                 )}
@@ -602,15 +601,14 @@ function Travado({
   nota,
   situacao,
   substatus,
-  limite,
-  limiteOrigem,
+  liberaEm,
 }: {
   bloqueio: { tipo: string; causa: string | null } | null;
   nota: { situacao: string; erro_mensagem: string | null } | null;
   situacao: string | null;
   substatus: string | null;
-  limite: string | null;
-  limiteOrigem: string | null;
+  /** Quando o canal libera a etiqueta. Só esta data responde "quando sai daqui". */
+  liberaEm: string | null;
 }) {
   const linha = (titulo: string, detalhe?: string | null, tom?: "critico") => (
     <span className="block text-[12.5px] leading-snug">
@@ -638,22 +636,20 @@ function Travado({
   }
 
   if (situacao === "pending") {
-    // A liberação é a única data que responde "quando sai daqui".
-    const liberaEm =
-      limite && limiteOrigem === "liberacao da etiqueta"
-        ? new Date(limite).toLocaleString("pt-BR", {
-            day: "2-digit",
-            month: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "America/Sao_Paulo",
-          })
-        : null;
+    const quando = liberaEm
+      ? new Date(liberaEm).toLocaleString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "America/Sao_Paulo",
+        })
+      : null;
 
     return linha(
       "O canal ainda não liberou o envio",
-      liberaEm
-        ? `libera em ${liberaEm} — não há o que fazer antes`
+      quando
+        ? `libera em ${quando} — não há o que fazer antes`
         : "não há o que fazer até o canal liberar",
     );
   }

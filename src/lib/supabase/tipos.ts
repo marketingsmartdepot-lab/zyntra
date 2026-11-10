@@ -78,15 +78,15 @@ export type LinhaPacote = {
     ref_externa: string;
     limite_envio_em: string | null;
     /**
-     * De onde veio `limite_envio_em`, nas palavras do banco: `liberacao da
-     * etiqueta` ou `prazo de despacho do ML`.
+     * Quando o canal libera a etiqueta deste envio.
      *
-     * A mesma data significa coisas opostas nos dois casos. Liberação é "não
-     * dá para fazer nada antes disto"; prazo de despacho é "tem que sair até
-     * isto". Mostrar uma como a outra inverte o sentido da tela, então a
-     * coluna de motivo em Aberto só cita a data quando a origem é liberação.
+     * Coluna própria, e não um sentido alternativo de `limite_envio_em`:
+     * liberação é "não dá para fazer nada antes disto" e prazo de despacho é
+     * "tem que sair até isto". Enquanto dividiam a mesma coluna, o prazo do
+     * SLA chegava depois e apagava a liberação — em 10/11 eram 18 de 19
+     * envios aguardando o canal sem data, com a data intacta no JSON cru.
      */
-    limite_origem: string | null;
+    libera_etiqueta_em: string | null;
     etiqueta_obtida_em: string | null;
     /** O que o canal diz do transporte. É o que Enviado mostra no cartão. */
     situacao_canal: string | null;

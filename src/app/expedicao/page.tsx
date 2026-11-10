@@ -24,7 +24,7 @@ export const metadata = { title: "Expedição — ZYNTRA" };
 
 const SELECAO = `
   id, etapa, etapa_desde, unidades_esperadas,
-  envios ( ref_externa, limite_envio_em, limite_origem, etiqueta_obtida_em,
+  envios ( ref_externa, limite_envio_em, libera_etiqueta_em, etiqueta_obtida_em,
            situacao_canal, substatus_canal,
            modalidades ( nome, gera_etiqueta ),
            pedidos ( ref_externa, pack_ref, comprador ) ),
