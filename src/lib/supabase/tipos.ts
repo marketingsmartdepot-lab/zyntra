@@ -77,6 +77,16 @@ export type LinhaPacote = {
   envios: {
     ref_externa: string;
     limite_envio_em: string | null;
+    /**
+     * De onde veio `limite_envio_em`, nas palavras do banco: `liberacao da
+     * etiqueta` ou `prazo de despacho do ML`.
+     *
+     * A mesma data significa coisas opostas nos dois casos. Liberação é "não
+     * dá para fazer nada antes disto"; prazo de despacho é "tem que sair até
+     * isto". Mostrar uma como a outra inverte o sentido da tela, então a
+     * coluna de motivo em Aberto só cita a data quando a origem é liberação.
+     */
+    limite_origem: string | null;
     etiqueta_obtida_em: string | null;
     /** O que o canal diz do transporte. É o que Enviado mostra no cartão. */
     situacao_canal: string | null;

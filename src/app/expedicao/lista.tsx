@@ -94,6 +94,9 @@ export function ListaPacotes({
               />
             </Cabecalho>
             <Cabecalho largura="142px">Data limite</Cabecalho>
+            {vista === "aberto" && (
+              <Cabecalho largura="230px">Por que está travado</Cabecalho>
+            )}
             <Cabecalho largura="158px">NF-e</Cabecalho>
             <Cabecalho largura="150px">Etiqueta</Cabecalho>
             <Cabecalho largura="96px">Espera</Cabecalho>
@@ -216,6 +219,19 @@ export function ListaPacotes({
                     jaSaiu={vista === "enviado" || vista === "entregue"}
                   />
                 </Celula>
+
+                {vista === "aberto" && (
+                  <Celula>
+                    <Travado
+                      bloqueio={(p.bloqueios ?? [])[0] ?? null}
+                      nota={nota}
+                      situacao={envio?.situacao_canal ?? null}
+                      substatus={envio?.substatus_canal ?? null}
+                      limite={envio?.limite_envio_em ?? null}
+                      limiteOrigem={envio?.limite_origem ?? null}
+                    />
+                  </Celula>
+                )}
 
                 <Celula>
                   {!nota ? (
@@ -554,6 +570,105 @@ function Espera({ desde }: { desde: string }) {
     >
       {texto}
     </span>
+  );
+}
+
+/**
+ * Por que este pedido está parado em Aberto. Só existe nessa aba.
+ *
+ * Aberto é a aba onde nada anda, e até aqui ela não dizia POR QUE. Quem
+ * olhava via uma data na coluna de prazo e concluía atraso — quando na maioria
+ * dos casos o pedido está esperando o canal, e não há nada a fazer.
+ *
+ * A ordem não é estética, é de autoridade:
+ *
+ *   1. BLOQUEIO. A causa vem escrita de `diagnosticar_pacote`, a MESMA frase
+ *      que o painel de causas usa. Não reescrevo aqui: duas cópias do mesmo
+ *      texto divergem, e neste sistema já divergiram.
+ *   2. NOTA REJEITADA. O ML nomeia o problema e às vezes o campo. É o que a
+ *      pessoa tem de consertar, então ganha a vez sobre o estado do envio.
+ *   3. CANAL NÃO LIBEROU. Espera legítima, sem culpa de ninguém.
+ *   4. CANAL ESPERA A NOTA. O envio está liberado e falta faturar.
+ *   5. Nada identificado -> diz isso. Chutar motivo é pior que admitir que
+ *      não sei: linha sem motivo em Aberto é defeito novo, e eu quero que ela
+ *      apareça em vez de se esconder atrás de uma frase plausível.
+ *
+ * A data só entra no caso 3, e só quando `limite_origem` diz que ela é a
+ * liberação da etiqueta. Quando é prazo de despacho, a data não responde
+ * "quando libera" — então citá-la ali seria inventar uma promessa.
+ */
+function Travado({
+  bloqueio,
+  nota,
+  situacao,
+  substatus,
+  limite,
+  limiteOrigem,
+}: {
+  bloqueio: { tipo: string; causa: string | null } | null;
+  nota: { situacao: string; erro_mensagem: string | null } | null;
+  situacao: string | null;
+  substatus: string | null;
+  limite: string | null;
+  limiteOrigem: string | null;
+}) {
+  const linha = (titulo: string, detalhe?: string | null, tom?: "critico") => (
+    <span className="block text-[12.5px] leading-snug">
+      <span className={`font-semibold ${tom === "critico" ? "text-critico" : ""}`}>
+        {titulo}
+      </span>
+      {detalhe && (
+        <span className="mt-[2px] block text-[11px] font-medium text-suave">
+          {detalhe}
+        </span>
+      )}
+    </span>
+  );
+
+  if (bloqueio?.causa) {
+    return linha(bloqueio.causa, null, "critico");
+  }
+
+  if (nota?.situacao === "rejeitada") {
+    return linha(
+      "O Mercado Livre recusou a nota",
+      nota.erro_mensagem ?? "sem mensagem do canal",
+      "critico",
+    );
+  }
+
+  if (situacao === "pending") {
+    // A liberação é a única data que responde "quando sai daqui".
+    const liberaEm =
+      limite && limiteOrigem === "liberacao da etiqueta"
+        ? new Date(limite).toLocaleString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "America/Sao_Paulo",
+          })
+        : null;
+
+    return linha(
+      "O canal ainda não liberou o envio",
+      liberaEm
+        ? `libera em ${liberaEm} — não há o que fazer antes`
+        : "não há o que fazer até o canal liberar",
+    );
+  }
+
+  if (substatus === "invoice_pending") {
+    return linha(
+      "O canal está esperando a nota fiscal",
+      "o envio já foi liberado; falta faturar",
+    );
+  }
+
+  return linha(
+    "Motivo não identificado",
+    `o canal diz ${situacao ?? "?"}${substatus ? ` / ${substatus}` : ""}`,
+    "critico",
   );
 }
 
