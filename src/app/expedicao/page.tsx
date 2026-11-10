@@ -273,6 +273,14 @@ export default async function PaginaExpedicao({
                     ? "Só pacote em Separar entra em lista."
                   : falha === "pacote_sem_sku_mapeado"
                     ? "Tem anúncio sem SKU correspondente. Mapeie em Integração — sem SKU o produto não aparece na lista nem tem código para bipar."
+                  : falha === "sem_permissao"
+                    ? "Seu perfil não pode gerar lista."
+                  : /* O que o banco ou o transporte disseram, por extenso.
+                       Trocar isso por "não foi possível" apagava justamente a
+                       única pista de um defeito que ninguém previu — e foi o
+                       que me fez passar meia hora adivinhando em 10/11. */
+                    falha.startsWith("erro:")
+                    ? `Falhou: ${falha.slice(5)}`
                     : "Não foi possível gerar a lista."}
               </span>
             )}

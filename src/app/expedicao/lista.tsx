@@ -364,11 +364,28 @@ export function ListaPacotes({
               >
                 Motivo (obrigatório)
               </label>
+              {/*
+                SEM `required` nem `minLength`, de propósito.
+
+                A engrenagem mora dentro do <form> para enxergar as caixas
+                marcadas, e este campo fica escondido no <details> fechado.
+                Com `required`, o navegador validava o formulário INTEIRO em
+                qualquer botão dele: clicar em "Mandar pro coletor" falhava a
+                validação deste campo vazio, e como ele está escondido o
+                navegador não consegue focá-lo nem mostrar o balão — cancela a
+                submissão e não diz nada. Tela parada, sem mensagem, sem
+                pending. Matou gerar lista, mandar pro coletor, devolver para a
+                esteira e levar para a doca, de 26/10 até 10/11.
+
+                Quem valida é `alterarEtapaDosMarcados`, que já recusava motivo
+                com menos de 5 caracteres e devolve `motivo_curto` — frase que
+                esta tela já sabe dizer. Validação de verdade mora no servidor;
+                `required` de HTML não protege nada e aqui custava os outros
+                botões.
+              */}
               <input
                 id="etapa-motivo"
                 name="motivo_etapa"
-                required
-                minLength={5}
                 placeholder="ex.: cliente retirou no balcão"
                 className="mb-3 w-full rounded-lg border border-linha bg-superficie px-3 py-[8px] text-[13px]"
               />

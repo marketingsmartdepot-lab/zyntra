@@ -19,8 +19,15 @@ import { criarClienteServidor } from "@/lib/supabase/server";
  * Quem separa usa o sistema; o PIN identifica só quem bipa os carros na porta.
  */
 export async function gerarLista(destino: string, formData: FormData) {
+  const vista = String(formData.get("vista") ?? "separar");
   const ids = formData.getAll("pacote").map(String).filter(Boolean);
-  if (ids.length === 0) return;
+
+  // Sair calada aqui era indistinguivel de estar quebrado: a tela JA tem a
+  // frase ("Marque pelo menos uma caixa antes.") e nunca a recebia. As outras
+  // tres acoes da Expedicao mandam `nada_selecionado`; so esta nao mandava.
+  if (ids.length === 0) {
+    redirect(`/expedicao?etapa=${vista}&falha=nada_selecionado`);
+  }
 
   // O modo vem AMARRADO na ação, não num `name` do botão: o name/value do
   // botão que submete não chega de forma confiável até uma Server Action, e
@@ -37,9 +44,15 @@ export async function gerarLista(destino: string, formData: FormData) {
   const r = Array.isArray(data) ? data[0] : data;
 
   if (error || !r?.ok) {
-    const motivo = error ? "erro" : r?.motivo;
+    // A mensagem do erro ia para o lixo, trocada por "erro" -- e "erro" nao
+    // diz a ninguem o que fazer. Vai o motivo que o banco devolveu; quando o
+    // erro e do transporte, vai o texto dele, que e o que falta para
+    // diagnosticar sem adivinhar.
+    const motivo = error ? `erro:${error.message}` : (r?.motivo ?? "erro");
     revalidatePath("/expedicao");
-    redirect(`/expedicao?etapa=separar&falha=${motivo}`);
+    redirect(
+      `/expedicao?etapa=${vista}&falha=${encodeURIComponent(motivo)}`,
+    );
   }
 
   revalidatePath("/expedicao");
